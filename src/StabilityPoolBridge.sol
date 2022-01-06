@@ -9,16 +9,32 @@ import "./interfaces/IStabilityPool.sol";
 import "./interfaces/IDefiBridge.sol";
 import "./Types.sol";
 
-contract LiquityStabilityPoolBridge is IDefiBridge {
+contract StabilityPoolBridge is IDefiBridge {
     using SafeMath for uint256;
 
     address public immutable rollupProcessor;
 
     IStabilityPool stabilityPool;
 
+    uint64 private lastRegisteredFrontendId;
+    mapping(uint64 => address) public frontEndTags;
+    mapping(address => uint64) public frontEndIds;
+
     constructor(address _rollupProcessor, address _stabilityPool) public {
         rollupProcessor = _rollupProcessor;
         stabilityPool = IStabilityPool(_stabilityPool);
+    }
+
+    function registerFrontEnd(address _frontEndTag) external{
+        require(frontEndIds[_frontEndTag] == 0, "StabilityPoolBridge: Tag already registered");
+
+        uint64 id = lastRegisteredFrontendId + 1;
+        // 1844674407370955161 equals to type(uint64).max / 10
+        require(id < 1844674407370955161, "StabilityPoolBridge: Max number of frontends registered");
+
+        frontEndTags[id] = _frontEndTag;
+        frontEndIds[_frontEndTag] = id;
+        lastRegisteredFrontendId = id;
     }
 
     // Deposit:
