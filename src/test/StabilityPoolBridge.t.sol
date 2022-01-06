@@ -14,12 +14,26 @@ contract StabilityPoolBridgeTest is DSTest {
     }
 
     function test_registerFrontEnd() public {
-        stabilityPoolBridge.registerFrontEnd(address(0));
-        assertEq(stabilityPoolBridge.frontEndIds(address(0)), uint(1));
-        assertEq(stabilityPoolBridge.frontEndTags(uint64(1)), address(0));
+        // Testing addresses
+        address addr1 = address(1);
+        address addr2 = address(2);
 
-        stabilityPoolBridge.registerFrontEnd(address(1));
-        assertEq(stabilityPoolBridge.frontEndIds(address(1)), uint(2));
-        assertEq(stabilityPoolBridge.frontEndTags(uint64(2)), address(1));
+        // Check if first frontend registration sets id to 1 and
+        // if the return address is correct
+        stabilityPoolBridge.registerFrontEnd(addr1);
+        assertEq(stabilityPoolBridge.frontEndIds(addr1), uint(1));
+        assertEq(stabilityPoolBridge.frontEndTags(uint64(1)), addr1);
+
+        // Check if frontend id got incremented the second time
+        stabilityPoolBridge.registerFrontEnd(addr2);
+        assertEq(stabilityPoolBridge.frontEndIds(addr2), uint(2));
+        assertEq(stabilityPoolBridge.frontEndTags(uint64(2)), addr2);
+
+        // Verify that frontend can't be registered twice
+        try stabilityPoolBridge.registerFrontEnd(addr1) {
+            assertTrue(false, "Frontend can't be registered twice");
+        } catch Error(string memory reason) {
+            assertEq(reason, "StabilityPoolBridge: Tag already registered");
+        }
     }
 }
