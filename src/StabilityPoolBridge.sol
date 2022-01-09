@@ -2,8 +2,8 @@
 pragma solidity 0.6.11;
 pragma experimental ABIEncoderV2;
 
-
 import "../lib/openzeppelin-contracts/contracts/math/SafeMath.sol";
+import "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 import "./interfaces/IStabilityPool.sol";
 import "./interfaces/IDefiBridge.sol";
@@ -13,15 +13,16 @@ contract StabilityPoolBridge is IDefiBridge {
     using SafeMath for uint256;
 
     address public immutable rollupProcessor;
-
+    IERC20 public immutable lusdToken;
     IStabilityPool stabilityPool;
 
     uint64 private lastRegisteredFrontendId;
     mapping(uint64 => address) public frontEndTags; // see StabilityPool.sol for details
     mapping(address => uint64) public frontEndIds;
 
-    constructor(address _rollupProcessor, address _stabilityPool) public {
+    constructor(address _rollupProcessor, address _lusdToken, address _stabilityPool) public {
         rollupProcessor = _rollupProcessor;
+        lusdToken = IERC20(_lusdToken);
         stabilityPool = IStabilityPool(_stabilityPool);
     }
 
@@ -31,11 +32,11 @@ contract StabilityPoolBridge is IDefiBridge {
     * _frontEndTag - front end address (see StabilityPool.sol for details)
     */
     function registerFrontEnd(address _frontEndTag) external {
-        require(frontEndIds[_frontEndTag] == 0, "StabilityPoolBridge: Tag already registered");
+        require(frontEndIds[_frontEndTag] == 0, "StabilityPoolBridge: TAG_ALREADY_REGISTERED");
 
-        uint64 id = lastRegisteredFrontendId + 1;
         // 18446744073709551615 equals to type(uint64).max
-        require(id < 18446744073709551615, "StabilityPoolBridge: Max number of frontends registered");
+        require(lastRegisteredFrontendId != 18446744073709551615, "StabilityPoolBridge: UINT64_OVERFLOW");
+        uint64 id = lastRegisteredFrontendId + 1;
 
         frontEndTags[id] = _frontEndTag;
         frontEndIds[_frontEndTag] = id;
@@ -52,6 +53,10 @@ contract StabilityPoolBridge is IDefiBridge {
     * inputAssetA - StabilityPoolBridge ERC20
     * outputAssetA - LUSD
     * inputValue - the total amount of StabilityPoolBridge ERC20
+    *
+    * Note: The function will revert in case there are troves to be liquidated. I am not handling this scenario because
+    * I expect the liquidation bots to be so fast that the scenario will never occur. Checking for it would only waste gas.
+    * TODO: Is this ^ true even during deposit?
     */
     function convert(
         Types.AztecAsset calldata inputAssetA,
@@ -59,7 +64,7 @@ contract StabilityPoolBridge is IDefiBridge {
         Types.AztecAsset calldata outputAssetA,
         Types.AztecAsset calldata,
         uint256 inputValue,
-        uint256 interactionNonce,
+        uint256,
         uint64 auxData
     )
     external
@@ -70,8 +75,25 @@ contract StabilityPoolBridge is IDefiBridge {
         uint256,
         bool isAsync
     ) {
+        require(msg.sender == rollupProcessor, "StabilityPoolBridge: INVALID_CALLER");
+        require(inputAssetA.erc20Address == address(lusdToken) || inputAssetA.erc20Address == address(this), "StabilityPoolBridge: INCORRECT_INPUT");
+
+        if (inputAssetA.erc20Address == address(lusdToken)) {
+            // Deposit
+            require(lusdToken.approve(address(stabilityPool), inputValue), "StabilityPoolBridge: APPROVE_FAILED");
+            // Note: I am not checking whether the frontEndTag is non-zero because zero address is fine with StabilityPool.sol
+            stabilityPool.provideToSP(inputValue, frontEndTags[auxData]);
+            _swapRewardsToLUSD();
+
+        } else {
+            // Withdrawal
+        }
+
+        return (0, 0, false);
+    }
+
+    function _swapRewardsToLUSD() internal {
         // TODO
-        // Based on the input/output assets determine whether the call is deposit or withdrawal
     }
 
     function canFinalise(

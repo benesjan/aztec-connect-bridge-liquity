@@ -10,7 +10,7 @@ contract StabilityPoolBridgeTest is DSTest {
     function setUp() public {
         // For now I will set rollupProcessor and stabilityPool to zero addresses
         // as interaction with them is not yet necessary
-        stabilityPoolBridge = new StabilityPoolBridge(address(0), address(0));
+        stabilityPoolBridge = new StabilityPoolBridge(address(0), address(0), address(0));
     }
 
     function test_registerFrontEnd() public {
@@ -31,9 +31,9 @@ contract StabilityPoolBridgeTest is DSTest {
 
         // Verify that frontend can't be registered twice
         try stabilityPoolBridge.registerFrontEnd(addr1) {
-            assertTrue(false, "Frontend can't be registered twice");
+            assertTrue(false, "StabilityPoolBridgeTest: REPEATED_REGISTRATION_CHECK_FAILED");
         } catch Error(string memory reason) {
-            assertEq(reason, "StabilityPoolBridge: Tag already registered");
+            assertEq(reason, "StabilityPoolBridge: TAG_ALREADY_REGISTERED");
         }
     }
 }
