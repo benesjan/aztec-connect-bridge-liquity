@@ -17,7 +17,7 @@ contract StabilityPoolBridge is IDefiBridge {
     IStabilityPool stabilityPool;
 
     uint64 private lastRegisteredFrontendId;
-    mapping(uint64 => address) public frontEndTags;
+    mapping(uint64 => address) public frontEndTags; // see StabilityPool.sol for details
     mapping(address => uint64) public frontEndIds;
 
     constructor(address _rollupProcessor, address _stabilityPool) public {
@@ -25,34 +25,39 @@ contract StabilityPoolBridge is IDefiBridge {
         stabilityPool = IStabilityPool(_stabilityPool);
     }
 
-    function registerFrontEnd(address _frontEndTag) external{
+    /* registerFrontEnd():
+    * Registers front end address in frontEndTags mappings and generates a corresponding uint64 id.
+    *
+    * _frontEndTag - front end address (see StabilityPool.sol for details)
+    */
+    function registerFrontEnd(address _frontEndTag) external {
         require(frontEndIds[_frontEndTag] == 0, "StabilityPoolBridge: Tag already registered");
 
         uint64 id = lastRegisteredFrontendId + 1;
-        // 1844674407370955161 equals to type(uint64).max / 10
-        require(id < 1844674407370955161, "StabilityPoolBridge: Max number of frontends registered");
+        // 18446744073709551615 equals to type(uint64).max
+        require(id < 18446744073709551615, "StabilityPoolBridge: Max number of frontends registered");
 
         frontEndTags[id] = _frontEndTag;
         frontEndIds[_frontEndTag] = id;
         lastRegisteredFrontendId = id;
     }
 
-    // Deposit:
-    // inputAssetA - LUSD (during deposit)
-    // outputAssetA - virtual asset representing the position
-    // (Note: Liquity doesn't mint any token representing the position)
+    /*
+    * Deposit:
+    * inputAssetA - LUSD
+    * outputAssetA - StabilityPoolBridge ERC20
+    * auxData - frontEndId
 
-    // Withdrawal:
-    // inputAssetA - virtual asset
-    // outputAssetA - LUSD
-    // outputAssetB - LQTY reward
-    // Note: There is also ETH reward transferred during withdrawal.
-    // Since only 2 output assets are allowed I will swap ETH for LUSD.
+    * Withdrawal:
+    * inputAssetA - StabilityPoolBridge ERC20
+    * outputAssetA - LUSD
+    * inputValue - the total amount of StabilityPoolBridge ERC20
+    */
     function convert(
         Types.AztecAsset calldata inputAssetA,
         Types.AztecAsset calldata,
         Types.AztecAsset calldata outputAssetA,
-        Types.AztecAsset calldata outputAssetB,
+        Types.AztecAsset calldata,
         uint256 inputValue,
         uint256 interactionNonce,
         uint64 auxData
@@ -62,7 +67,7 @@ contract StabilityPoolBridge is IDefiBridge {
     override
     returns (
         uint256 outputValueA,
-        uint256 outputValueB,
+        uint256,
         bool isAsync
     ) {
         // TODO
