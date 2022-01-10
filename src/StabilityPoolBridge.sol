@@ -83,14 +83,30 @@ contract StabilityPoolBridge is IDefiBridge, ERC20 {
             // Deposit
             require(lusdToken.approve(address(stabilityPool), inputValue), "StabilityPoolBridge: APPROVE_FAILED");
             // Note: I am not checking whether the frontEndTag is non-zero because zero address is fine with StabilityPool.sol
+            // Rewards are claimed here
             stabilityPool.provideToSP(inputValue, frontEndTags[auxData]);
             _swapRewardsToLUSD();
-
+            uint totalLUSDOwned = lusdToken.balanceOf(address(this)).add(stabilityPool.getCompoundedLUSDDeposit(address(this)));
+            uint totalLUSDOwnedBeforeDeposit = totalLUSDOwned.sub(inputValue);
+            // outputValueA = how much SPB should be minted
+            if (this.totalSupply() == 0) {
+                // When the totalSupply is 0, I set the SPB/LUSD ratio to be 1
+                outputValueA = inputValue;
+            } else {
+                // this.totalSupply().div(totalLUSDOwnedBeforeDeposit) = how much one SPB is worth in terms of LUSD
+                // When I multiply this ^ with the amount of LUSD deposited I get the amount of SPB to be minted.
+                outputValueA = this.totalSupply().mul(inputValue).div(totalLUSDOwnedBeforeDeposit);
+            }
+            _mint(rollupProcessor, outputValueA);
         } else {
             // Withdrawal
+            // Rewards are claimed here
+            stabilityPool.withdrawFromSP(inputValue);
+            _swapRewardsToLUSD();
+
         }
 
-        return (0, 0, false);
+        return (outputValueA, 0, false);
     }
 
     function _swapRewardsToLUSD() internal {
