@@ -15,44 +15,25 @@ contract StabilityPoolBridge is IDefiBridge, ERC20 {
 
     address public immutable rollupProcessor;
     IERC20 public immutable lusdToken;
-    IStabilityPool stabilityPool;
+    IStabilityPool public immutable stabilityPool;
+    address public immutable frontEndTag; // see StabilityPool.sol for details
 
-    uint64 private lastRegisteredFrontendId;
-    mapping(uint64 => address) public frontEndTags; // see StabilityPool.sol for details
-    mapping(address => uint64) public frontEndIds;
-
-    constructor(address _rollupProcessor, address _lusdToken, address _stabilityPool) public ERC20("StabilityPoolBridge", "SPB") {
+    constructor(address _rollupProcessor, address _lusdToken, address _stabilityPool, address _frontEndTag) public ERC20("StabilityPoolBridge", "SPB") {
         rollupProcessor = _rollupProcessor;
         lusdToken = IERC20(_lusdToken);
         stabilityPool = IStabilityPool(_stabilityPool);
+        // Note: frontEndTag is set only once for msg.sender in StabilityPool.sol. Can be zero address.
+        frontEndTag = _frontEndTag;
 
         // Note: StabilityPoolBridge never holds LUSD after an invocation of any of its functions.
         // For this reason the following is not a security risk and makes the convert() function more gas efficient.
-        require(IERC20(_lusdToken).approve(address(stabilityPool), type(uint256).max), "StabilityPoolBridge: APPROVE_FAILED");
-    }
-
-    /* registerFrontEnd():
-    * Registers front end address in frontEndTags mappings and generates a corresponding uint64 id.
-    *
-    * _frontEndTag - front end address (see StabilityPool.sol for details)
-    */
-    function registerFrontEnd(address _frontEndTag) external {
-        require(frontEndIds[_frontEndTag] == 0, "StabilityPoolBridge: TAG_ALREADY_REGISTERED");
-
-        // 18446744073709551615 equals to type(uint64).max
-        require(lastRegisteredFrontendId != 18446744073709551615, "StabilityPoolBridge: UINT64_OVERFLOW");
-        uint64 id = lastRegisteredFrontendId + 1;
-
-        frontEndTags[id] = _frontEndTag;
-        frontEndIds[_frontEndTag] = id;
-        lastRegisteredFrontendId = id;
+        require(IERC20(_lusdToken).approve(_stabilityPool, type(uint256).max), "StabilityPoolBridge: APPROVE_FAILED");
     }
 
     /*
     * Deposit:
     * inputAssetA - LUSD
     * outputAssetA - StabilityPoolBridge ERC20
-    * auxData - frontEndId
 
     * Withdrawal:
     * inputAssetA - StabilityPoolBridge ERC20
@@ -70,7 +51,7 @@ contract StabilityPoolBridge is IDefiBridge, ERC20 {
         Types.AztecAsset calldata,
         uint256 inputValue,
         uint256,
-        uint64 auxData
+        uint64
     )
     external
     payable
@@ -86,10 +67,9 @@ contract StabilityPoolBridge is IDefiBridge, ERC20 {
         if (inputAssetA.erc20Address == address(lusdToken)) {
             // Deposit
             require(lusdToken.transferFrom(rollupProcessor, address(stabilityPool), inputValue), "StabilityPoolBridge: TRANSFER_FAILED");
-            // Note: I am not checking whether the frontEndTag is non-zero because zero address is fine with StabilityPool.sol.
             // Rewards are claimed here.
-            stabilityPool.provideToSP(inputValue, frontEndTags[auxData]);
-            _swapAndDepositRewards(frontEndTags[auxData]);
+            stabilityPool.provideToSP(inputValue, frontEndTag);
+            _swapAndDepositRewards();
             uint totalLUSDOwnedBeforeDeposit = stabilityPool.getCompoundedLUSDDeposit(address(this)).sub(inputValue);
             // outputValueA = how much SPB should be minted
             if (this.totalSupply() == 0) {
@@ -105,7 +85,7 @@ contract StabilityPoolBridge is IDefiBridge, ERC20 {
             // Withdrawal
             // Rewards are claimed here.
             stabilityPool.withdrawFromSP(0);
-            _swapAndDepositRewards(frontEndTags[auxData]);
+            _swapAndDepositRewards();
 
             uint totalLUSDOwned = stabilityPool.getCompoundedLUSDDeposit(address(this));
             uint priceOf1SPB = this.totalSupply().div(totalLUSDOwned);
@@ -118,11 +98,11 @@ contract StabilityPoolBridge is IDefiBridge, ERC20 {
     /*
     * Swaps any ETH and LQTY currently held by the contract to LUSD and deposits LUSD to StabilityPool.sol.
     */
-    function _swapAndDepositRewards(uint64 frontEndId) internal {
+    function _swapAndDepositRewards() internal {
         // TODO
         uint lusdHeldByBridge = lusdToken.balanceOf(address(this));
         if (lusdHeldByBridge != 0) {
-            stabilityPool.provideToSP(lusdHeldByBridge, frontEndId);
+            stabilityPool.provideToSP(lusdHeldByBridge, frontEndTag);
         }
     }
 
