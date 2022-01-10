@@ -25,6 +25,10 @@ contract StabilityPoolBridge is IDefiBridge, ERC20 {
         rollupProcessor = _rollupProcessor;
         lusdToken = IERC20(_lusdToken);
         stabilityPool = IStabilityPool(_stabilityPool);
+
+        // Note: StabilityPoolBridge never holds LUSD after an invocation of any of its functions.
+        // For this reason the following is not a security risk and makes the convert() function more gas efficient.
+        require(IERC20(_lusdToken).approve(address(stabilityPool), type(uint256).max), "StabilityPoolBridge: APPROVE_FAILED");
     }
 
     /* registerFrontEnd():
@@ -81,16 +85,15 @@ contract StabilityPoolBridge is IDefiBridge, ERC20 {
 
         if (inputAssetA.erc20Address == address(lusdToken)) {
             // Deposit
-            require(lusdToken.approve(address(stabilityPool), inputValue), "StabilityPoolBridge: APPROVE_FAILED");
-            // Note: I am not checking whether the frontEndTag is non-zero because zero address is fine with StabilityPool.sol
-            // Rewards are claimed here
+            require(lusdToken.transferFrom(rollupProcessor, address(stabilityPool), inputValue), "StabilityPoolBridge: TRANSFER_FAILED");
+            // Note: I am not checking whether the frontEndTag is non-zero because zero address is fine with StabilityPool.sol.
+            // Rewards are claimed here.
             stabilityPool.provideToSP(inputValue, frontEndTags[auxData]);
-            _swapRewardsToLUSD();
-            uint totalLUSDOwned = lusdToken.balanceOf(address(this)).add(stabilityPool.getCompoundedLUSDDeposit(address(this)));
-            uint totalLUSDOwnedBeforeDeposit = totalLUSDOwned.sub(inputValue);
+            _swapAndDepositRewards(frontEndTags[auxData]);
+            uint totalLUSDOwnedBeforeDeposit = stabilityPool.getCompoundedLUSDDeposit(address(this)).sub(inputValue);
             // outputValueA = how much SPB should be minted
             if (this.totalSupply() == 0) {
-                // When the totalSupply is 0, I set the SPB/LUSD ratio to be 1
+                // When the totalSupply is 0, I set the SPB/LUSD ratio to be 1.
                 outputValueA = inputValue;
             } else {
                 // this.totalSupply().div(totalLUSDOwnedBeforeDeposit) = how much one SPB is worth in terms of LUSD
@@ -100,17 +103,27 @@ contract StabilityPoolBridge is IDefiBridge, ERC20 {
             _mint(rollupProcessor, outputValueA);
         } else {
             // Withdrawal
-            // Rewards are claimed here
-            stabilityPool.withdrawFromSP(inputValue);
-            _swapRewardsToLUSD();
+            // Rewards are claimed here.
+            stabilityPool.withdrawFromSP(0);
+            _swapAndDepositRewards(frontEndTags[auxData]);
+
+            uint totalLUSDOwned = stabilityPool.getCompoundedLUSDDeposit(address(this));
+            uint priceOf1SPB = this.totalSupply().div(totalLUSDOwned);
 
         }
 
         return (outputValueA, 0, false);
     }
 
-    function _swapRewardsToLUSD() internal {
+    /*
+    * Swaps any ETH and LQTY currently held by the contract to LUSD and deposits LUSD to StabilityPool.sol.
+    */
+    function _swapAndDepositRewards(uint64 frontEndId) internal {
         // TODO
+        uint lusdHeldByBridge = lusdToken.balanceOf(address(this));
+        if (lusdHeldByBridge != 0) {
+            stabilityPool.provideToSP(lusdHeldByBridge, frontEndId);
+        }
     }
 
     function canFinalise(
