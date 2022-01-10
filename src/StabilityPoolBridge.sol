@@ -66,7 +66,7 @@ contract StabilityPoolBridge is IDefiBridge, ERC20 {
 
         if (inputAssetA.erc20Address == address(lusdToken)) {
             // Deposit
-            require(lusdToken.transferFrom(rollupProcessor, address(stabilityPool), inputValue), "StabilityPoolBridge: TRANSFER_FAILED");
+            require(lusdToken.transferFrom(rollupProcessor, address(stabilityPool), inputValue), "StabilityPoolBridge: DEPOSIT_TRANSFER_FAILED");
             // Rewards are claimed here.
             stabilityPool.provideToSP(inputValue, frontEndTag);
             _swapAndDepositRewards();
@@ -76,7 +76,7 @@ contract StabilityPoolBridge is IDefiBridge, ERC20 {
                 // When the totalSupply is 0, I set the SPB/LUSD ratio to be 1.
                 outputValueA = inputValue;
             } else {
-                // this.totalSupply().div(totalLUSDOwnedBeforeDeposit) = how much one SPB is worth in terms of LUSD
+                // this.totalSupply().div(totalLUSDOwnedBeforeDeposit) = how much SPB one LUSD is worth
                 // When I multiply this ^ with the amount of LUSD deposited I get the amount of SPB to be minted.
                 outputValueA = this.totalSupply().mul(inputValue).div(totalLUSDOwnedBeforeDeposit);
             }
@@ -87,9 +87,12 @@ contract StabilityPoolBridge is IDefiBridge, ERC20 {
             stabilityPool.withdrawFromSP(0);
             _swapAndDepositRewards();
 
-            uint totalLUSDOwned = stabilityPool.getCompoundedLUSDDeposit(address(this));
-            uint priceOf1SPB = this.totalSupply().div(totalLUSDOwned);
-
+            // stabilityPool.getCompoundedLUSDDeposit(address(this)).div(this.totalSupply()) = how much LUSD one SPB is worth
+            // outputValueA = amount of LUSD to be withdrawn and sent to rollupProcessor
+            uint outputValueA = stabilityPool.getCompoundedLUSDDeposit(address(this)).mul(inputValue).div(this.totalSupply());
+            stabilityPool.withdrawFromSP(outputValueA);
+            _burn(rollupProcessor, inputValue);
+            require(lusdToken.transferFrom(address(stabilityPool), rollupProcessor, outputValueA), "StabilityPoolBridge: WITHDRAWAL_TRANSFER_FAILED");
         }
 
         return (outputValueA, 0, false);
