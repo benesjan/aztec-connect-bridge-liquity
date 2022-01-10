@@ -13,6 +13,12 @@ contract StabilityPoolBridgeTest is DSTest {
         stabilityPoolBridge = new StabilityPoolBridge(address(0), address(0), address(0));
     }
 
+    function test_initialERC20Params() public {
+        assertEq(stabilityPoolBridge.name(), "StabilityPoolBridge");
+        assertEq(stabilityPoolBridge.symbol(), "SPB");
+        assertEq(uint256(stabilityPoolBridge.decimals()), 18);
+    }
+
     function test_registerFrontEnd() public {
         // Testing addresses
         address addr1 = address(1);

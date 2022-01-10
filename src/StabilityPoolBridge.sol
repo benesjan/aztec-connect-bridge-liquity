@@ -4,12 +4,13 @@ pragma experimental ABIEncoderV2;
 
 import "../lib/openzeppelin-contracts/contracts/math/SafeMath.sol";
 import "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import "../lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 
 import "./interfaces/IStabilityPool.sol";
 import "./interfaces/IDefiBridge.sol";
 import "./Types.sol";
 
-contract StabilityPoolBridge is IDefiBridge {
+contract StabilityPoolBridge is IDefiBridge, ERC20 {
     using SafeMath for uint256;
 
     address public immutable rollupProcessor;
@@ -20,7 +21,7 @@ contract StabilityPoolBridge is IDefiBridge {
     mapping(uint64 => address) public frontEndTags; // see StabilityPool.sol for details
     mapping(address => uint64) public frontEndIds;
 
-    constructor(address _rollupProcessor, address _lusdToken, address _stabilityPool) public {
+    constructor(address _rollupProcessor, address _lusdToken, address _stabilityPool) public ERC20("StabilityPoolBridge", "SPB") {
         rollupProcessor = _rollupProcessor;
         lusdToken = IERC20(_lusdToken);
         stabilityPool = IStabilityPool(_stabilityPool);
