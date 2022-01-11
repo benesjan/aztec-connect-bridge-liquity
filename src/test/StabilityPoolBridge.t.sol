@@ -15,8 +15,9 @@ contract StabilityPoolBridgeTest is TestUtil {
         address rollupProcessor = address(this);
         address stabilityPool = 0x66017D22b0f8556afDd19FC67041899Eb65a21bb;
         address frontEndTag = address(0);
+        address uniRouter = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
 
-        stabilityPoolBridge = new StabilityPoolBridge(rollupProcessor, tokens["LUSD"].addr, stabilityPool, frontEndTag);
+        stabilityPoolBridge = new StabilityPoolBridge(rollupProcessor, stabilityPool, frontEndTag, uniRouter, tokens["LUSD"].addr, tokens["WETH"].addr, tokens["LQTY"].addr);
     }
 
     function test_initialERC20Params() public {

@@ -29,6 +29,10 @@ contract TestUtil is DSTest {
     function setUpTokens() public {
         tokens["LUSD"].addr = 0x5f98805A4E8be255a32880FDeC7F6728C6568bA0;
         tokens["LUSD"].slot = 2;
+        tokens["WETH"].addr = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+        tokens["WETH"].slot = 3;
+        tokens["LQTY"].addr = 0x6DEA81C8171D0bA574754EF6F8b412F2Ed88c54D;
+        tokens["LQTY"].slot = 0; // TODO: which slot?
     }
 
     // Manipulate mainnet ERC20 balance
