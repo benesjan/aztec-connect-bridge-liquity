@@ -34,15 +34,18 @@ contract StabilityPoolBridge is IDefiBridge, ERC20 {
     * Deposit:
     * inputAssetA - LUSD
     * outputAssetA - StabilityPoolBridge ERC20
+    * inputValue - the amount of LUSD to deposit
+    * auxData - id of DEX used to swap rewards (0 - Uniswap, 1 - 1inch)
 
     * Withdrawal:
     * inputAssetA - StabilityPoolBridge ERC20
     * outputAssetA - LUSD
-    * inputValue - the total amount of StabilityPoolBridge ERC20
+    * inputValue - the amount of StabilityPoolBridge ERC20
+    * auxData - id of DEX used to swap rewards (0 - Uniswap, 1 - 1inch)
     *
-    * Note: The function will revert in case there are troves to be liquidated. I am not handling this scenario because
-    * I expect the liquidation bots to be so fast that the scenario will never occur. Checking for it would only waste gas.
-    * TODO: Is this ^ true even during deposit?
+    * Note: The function will revert during withdrawal in case there are troves to be liquidated. I am not handling
+    * this scenario because I expect the liquidation bots to be so fast that the scenario will never occur. Checking
+    * for it would only waste gas.
     */
     function convert(
         Types.AztecAsset calldata inputAssetA,
@@ -51,7 +54,7 @@ contract StabilityPoolBridge is IDefiBridge, ERC20 {
         Types.AztecAsset calldata,
         uint256 inputValue,
         uint256,
-        uint64
+        uint64 auxData
     )
     external
     payable
@@ -69,7 +72,7 @@ contract StabilityPoolBridge is IDefiBridge, ERC20 {
             require(lusdToken.transferFrom(rollupProcessor, address(this), inputValue), "StabilityPoolBridge: DEPOSIT_TRANSFER_FAILED");
             // Rewards are claimed here.
             stabilityPool.provideToSP(inputValue, frontEndTag);
-            _swapAndDepositRewards();
+            _swapAndDepositRewards(auxData);
             uint totalLUSDOwnedBeforeDeposit = stabilityPool.getCompoundedLUSDDeposit(address(this)).sub(inputValue);
             // outputValueA = how much SPB should be minted
             if (this.totalSupply() == 0) {
@@ -85,7 +88,7 @@ contract StabilityPoolBridge is IDefiBridge, ERC20 {
             // Withdrawal
             // Rewards are claimed here.
             stabilityPool.withdrawFromSP(0);
-            _swapAndDepositRewards();
+            _swapAndDepositRewards(auxData);
 
             // stabilityPool.getCompoundedLUSDDeposit(address(this)).div(this.totalSupply()) = how much LUSD one SPB is worth
             // outputValueA = amount of LUSD to be withdrawn and sent to rollupProcessor
@@ -101,11 +104,33 @@ contract StabilityPoolBridge is IDefiBridge, ERC20 {
     /*
     * Swaps any ETH and LQTY currently held by the contract to LUSD and deposits LUSD to StabilityPool.sol.
     */
-    function _swapAndDepositRewards() internal {
-        // TODO
+    function _swapAndDepositRewards(uint64 dexId) internal {
+        if (dexId == 0) {
+            _swapRewardsOnUni();
+        } else {
+            _swapRewardsOn1inch();
+        }
         uint lusdHeldByBridge = lusdToken.balanceOf(address(this));
         if (lusdHeldByBridge != 0) {
             stabilityPool.provideToSP(lusdHeldByBridge, frontEndTag);
+        }
+    }
+
+    function _swapRewardsOnUni() internal {
+        if (address(this).balance != 0) {
+
+        }
+        if (lusdToken.balanceOf(address(this)) != 0) {
+
+        }
+    }
+
+    function _swapRewardsOn1inch() internal {
+        if (address(this).balance != 0) {
+
+        }
+        if (lusdToken.balanceOf(address(this)) != 0) {
+
         }
     }
 
