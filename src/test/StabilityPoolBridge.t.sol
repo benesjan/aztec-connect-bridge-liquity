@@ -1,16 +1,20 @@
 // SPDX-License-Identifier: GPL-2.0-only
 pragma solidity 0.6.11;
 
-import "../../lib/ds-test/src/test.sol";
 import "../StabilityPoolBridge.sol";
+import "./TestUtil.sol";
 
-contract StabilityPoolBridgeTest is DSTest {
+contract StabilityPoolBridgeTest is TestUtil {
     StabilityPoolBridge private stabilityPoolBridge;
 
     function setUp() public {
-        // For now I will set rollupProcessor and stabilityPool to zero addresses
-        // as interaction with them is not yet necessary
-        stabilityPoolBridge = new StabilityPoolBridge(address(0), address(0), address(0), address(0));
+        setUpTokens();
+
+        address rollupProcessor = address(0);
+        address stabilityPool = 0x5f98805A4E8be255a32880FDeC7F6728C6568bA0;
+        address frontEndTag = address(0);
+
+        stabilityPoolBridge = new StabilityPoolBridge(rollupProcessor, tokens["LUSD"].addr, stabilityPool, frontEndTag);
     }
 
     function test_initialERC20Params() public {
