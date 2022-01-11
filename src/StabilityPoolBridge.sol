@@ -66,7 +66,7 @@ contract StabilityPoolBridge is IDefiBridge, ERC20 {
 
         if (inputAssetA.erc20Address == address(lusdToken)) {
             // Deposit
-            require(lusdToken.transferFrom(rollupProcessor, address(stabilityPool), inputValue), "StabilityPoolBridge: DEPOSIT_TRANSFER_FAILED");
+            require(lusdToken.transferFrom(rollupProcessor, address(this), inputValue), "StabilityPoolBridge: DEPOSIT_TRANSFER_FAILED");
             // Rewards are claimed here.
             stabilityPool.provideToSP(inputValue, frontEndTag);
             _swapAndDepositRewards();
@@ -92,7 +92,7 @@ contract StabilityPoolBridge is IDefiBridge, ERC20 {
             uint outputValueA = stabilityPool.getCompoundedLUSDDeposit(address(this)).mul(inputValue).div(this.totalSupply());
             stabilityPool.withdrawFromSP(outputValueA);
             _burn(rollupProcessor, inputValue);
-            require(lusdToken.transferFrom(address(stabilityPool), rollupProcessor, outputValueA), "StabilityPoolBridge: WITHDRAWAL_TRANSFER_FAILED");
+            require(lusdToken.transfer(rollupProcessor, outputValueA), "StabilityPoolBridge: WITHDRAWAL_TRANSFER_FAILED");
         }
 
         return (outputValueA, 0, false);
