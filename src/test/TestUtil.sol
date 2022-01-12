@@ -39,7 +39,7 @@ contract TestUtil is DSTest {
         tokens["WETH"].addr = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
         tokens["WETH"].slot = 3;
         tokens["LQTY"].addr = 0x6DEA81C8171D0bA574754EF6F8b412F2Ed88c54D;
-        tokens["LQTY"].slot = 0; // TODO: which slot?
+        tokens["LQTY"].slot = 0;
     }
 
     // Manipulate mainnet ERC20 balance

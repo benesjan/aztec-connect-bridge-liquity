@@ -40,9 +40,10 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
         weth = IERC20(_weth);
         lqty = IERC20(_lqty);
 
-        // Note: StabilityPoolBridge never holds LUSD after an invocation of any of its functions.
+        // Note: StabilityPoolBridge never holds LUSD or LQTY after or before an invocation of any of its functions.
         // For this reason the following is not a security risk and makes the convert() function more gas efficient.
-        require(IERC20(_lusd).approve(_stabilityPool, type(uint256).max), "StabilityPoolBridge: APPROVE_FAILED");
+        require(IERC20(_lusd).approve(_stabilityPool, type(uint256).max), "StabilityPoolBridge: LUSD_APPROVE_FAILED");
+        require(IERC20(_lqty).approve(_uniRouter, type(uint256).max), "StabilityPoolBridge: LQTY_APPROVE_FAILED");
     }
 
     /*
