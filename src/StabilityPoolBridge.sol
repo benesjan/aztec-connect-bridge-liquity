@@ -145,7 +145,8 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
     }
 
     function _swapRewardsOnUni() internal {
-        if (address(this).balance != 0) {
+        uint256 ethBalance = address(this).balance;
+        if (ethBalance != 0) {
             uniRouter.exactInputSingle(
                 ISwapRouter.ExactInputSingleParams(
                     address(weth),
@@ -153,13 +154,15 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
                     3000,
                     address(this),
                     block.timestamp,
-                    address(this).balance,
+                    ethBalance,
                     0,
                     0
                 )
             );
         }
-        if (lqty.balanceOf(address(this)) != 0) {
+
+        uint256 lqtyBalance = lqty.balanceOf(address(this));
+        if (lqtyBalance != 0) {
             uniRouter.exactInputSingle(
                 ISwapRouter.ExactInputSingleParams(
                     address(lqty),
@@ -167,7 +170,7 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
                     3000,
                     address(this),
                     block.timestamp,
-                    address(this).balance,
+                    lqtyBalance,
                     0,
                     0
                 )
