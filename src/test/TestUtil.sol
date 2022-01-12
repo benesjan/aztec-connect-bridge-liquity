@@ -20,6 +20,8 @@ contract TestUtil is DSTest {
 
     Hevm hevm;
 
+    uint256 constant WAD = 10**18;
+
     struct Token {
         address addr; // ERC20 Mainnet address
         uint256 slot; // Balance storage slot

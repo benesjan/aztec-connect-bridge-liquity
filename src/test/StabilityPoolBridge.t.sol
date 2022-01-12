@@ -36,7 +36,7 @@ contract StabilityPoolBridgeTest is TestUtil {
 
     function test_fullDepositWithdrawalFlow() public {
         // I will deposit and withdraw 1 million LUSD
-        uint256 depositAmount = 10**6 * 10**18;
+        uint256 depositAmount = 10**6 * WAD;
 
         // 1. mint LUSD to this contract
         mint("LUSD", address(this), depositAmount);
