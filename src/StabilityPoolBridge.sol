@@ -11,7 +11,7 @@ import "./interfaces/IDefiBridge.sol";
 import "./Types.sol";
 import "./interfaces/ISwapRouter.sol";
 
-contract StabilityPoolBridge is IDefiBridge, ERC20 {
+contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB") {
     using SafeMath for uint256;
 
     address public immutable rollupProcessorAddr;
@@ -30,7 +30,7 @@ contract StabilityPoolBridge is IDefiBridge, ERC20 {
         address _lusd,
         address _weth,
         address _lqty
-    ) public ERC20("StabilityPoolBridge", "SPB") {
+    ) public {
         rollupProcessorAddr = _rollupProcessor;
         stabilityPool = IStabilityPool(_stabilityPool);
         // Note: frontEndTag is set only once for msg.sender in StabilityPool.sol. Can be zero address.
