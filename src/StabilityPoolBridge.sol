@@ -147,7 +147,7 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
     function _swapRewardsOnUni() internal {
         uint256 ethBalance = address(this).balance;
         if (ethBalance != 0) {
-            uniRouter.exactInputSingle(
+            uniRouter.exactInputSingle{value: ethBalance}(
                 ISwapRouter.ExactInputSingleParams(
                     address(weth),
                     address(lusd),
