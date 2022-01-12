@@ -17,7 +17,15 @@ contract StabilityPoolBridgeTest is TestUtil {
         address frontEndTag = address(0);
         address uniRouter = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
 
-        stabilityPoolBridge = new StabilityPoolBridge(rollupProcessor, stabilityPool, frontEndTag, uniRouter, tokens["LUSD"].addr, tokens["WETH"].addr, tokens["LQTY"].addr);
+        stabilityPoolBridge = new StabilityPoolBridge(
+            rollupProcessor,
+            stabilityPool,
+            frontEndTag,
+            uniRouter,
+            tokens["LUSD"].addr,
+            tokens["WETH"].addr,
+            tokens["LQTY"].addr
+        );
     }
 
     function test_initialERC20Params() public {
@@ -28,7 +36,7 @@ contract StabilityPoolBridgeTest is TestUtil {
 
     function test_fullDepositWithdrawalFlow() public {
         // I will deposit and withdraw 1 million LUSD
-        uint depositAmount = 10 ** 6 * 10 ** 18;
+        uint256 depositAmount = 10**6 * 10**18;
 
         // 1. mint LUSD to this contract
         mint("LUSD", address(this), depositAmount);
@@ -54,7 +62,10 @@ contract StabilityPoolBridgeTest is TestUtil {
         assertEq(stabilityPoolBridge.balanceOf(address(this)), depositAmount);
 
         // 6. Check the LUSD balance of StabilityPoolBridge in StabilityPool is equal to the amount of LUSD deposited
-        assertEq(stabilityPoolBridge.stabilityPool().getCompoundedLUSDDeposit(address(stabilityPoolBridge)), depositAmount);
+        assertEq(
+            stabilityPoolBridge.stabilityPool().getCompoundedLUSDDeposit(address(stabilityPoolBridge)),
+            depositAmount
+        );
 
         // 7. Withdraw LUSD from StabilityPool through the bridge
         stabilityPoolBridge.convert(

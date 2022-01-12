@@ -8,11 +8,14 @@ import "../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import "../../lib/ds-test/src/test.sol";
 
 interface Hevm {
-    function store(address, bytes32, bytes32) external;
+    function store(
+        address,
+        bytes32,
+        bytes32
+    ) external;
 }
 
 contract TestUtil is DSTest {
-
     using SafeMath for uint256;
 
     Hevm hevm;
@@ -24,7 +27,9 @@ contract TestUtil is DSTest {
 
     mapping(bytes32 => Token) tokens;
 
-    constructor() public {hevm = Hevm(address(bytes20(uint160(uint256(keccak256("hevm cheat code"))))));}
+    constructor() public {
+        hevm = Hevm(address(bytes20(uint160(uint256(keccak256("hevm cheat code"))))));
+    }
 
     function setUpTokens() public {
         tokens["LUSD"].addr = 0x5f98805A4E8be255a32880FDeC7F6728C6568bA0;
@@ -36,7 +41,11 @@ contract TestUtil is DSTest {
     }
 
     // Manipulate mainnet ERC20 balance
-    function mint(bytes32 symbol, address account, uint256 amt) public {
+    function mint(
+        bytes32 symbol,
+        address account,
+        uint256 amt
+    ) public {
         address addr = tokens[symbol].addr;
         uint256 slot = tokens[symbol].slot;
         uint256 bal = IERC20(addr).balanceOf(account);
