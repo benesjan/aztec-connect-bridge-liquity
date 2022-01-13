@@ -13,19 +13,9 @@ contract StabilityPoolBridgeTest is TestUtil {
         setUpTokens();
 
         address rollupProcessor = address(this);
-        address stabilityPool = 0x66017D22b0f8556afDd19FC67041899Eb65a21bb;
         address frontEndTag = address(0);
-        address uniRouter = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
 
-        stabilityPoolBridge = new StabilityPoolBridge(
-            rollupProcessor,
-            stabilityPool,
-            frontEndTag,
-            uniRouter,
-            tokens["LUSD"].addr,
-            tokens["WETH"].addr,
-            tokens["LQTY"].addr
-        );
+        stabilityPoolBridge = new StabilityPoolBridge(rollupProcessor, frontEndTag);
     }
 
     function testInitialERC20Params() public {
@@ -63,7 +53,7 @@ contract StabilityPoolBridgeTest is TestUtil {
 
         // 6. Check the LUSD balance of StabilityPoolBridge in StabilityPool is equal to the amount of LUSD deposited
         assertEq(
-            stabilityPoolBridge.stabilityPool().getCompoundedLUSDDeposit(address(stabilityPoolBridge)),
+            stabilityPoolBridge.STABILITY_POOL().getCompoundedLUSDDeposit(address(stabilityPoolBridge)),
             depositAmount
         );
 

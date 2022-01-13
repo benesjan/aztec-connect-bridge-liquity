@@ -14,36 +14,31 @@ import "./interfaces/ISwapRouter.sol";
 contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB") {
     using SafeMath for uint256;
 
-    address public immutable rollupProcessorAddr;
-    IStabilityPool public immutable stabilityPool;
-    address public immutable frontEndTag; // see StabilityPool.sol for details
-    ISwapRouter public immutable uniRouter;
-    IERC20 public immutable lusd;
-    IERC20 public immutable weth;
-    IERC20 public immutable lqty;
+    address public constant LUSD = 0x5f98805A4E8be255a32880FDeC7F6728C6568bA0;
+    address public constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+    address public constant LQTY = 0x6DEA81C8171D0bA574754EF6F8b412F2Ed88c54D;
 
-    constructor(
-        address _rollupProcessor,
-        address _stabilityPool,
-        address _frontEndTag,
-        address _uniRouter,
-        address _lusd,
-        address _weth,
-        address _lqty
-    ) public {
+    IStabilityPool public constant STABILITY_POOL = IStabilityPool(0x66017D22b0f8556afDd19FC67041899Eb65a21bb);
+    ISwapRouter public constant UNI_ROUTER = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
+
+    address public immutable rollupProcessorAddr;
+    address public immutable frontEndTag; // see StabilityPool.sol for details
+
+    constructor(address _rollupProcessor, address _frontEndTag) public {
         rollupProcessorAddr = _rollupProcessor;
-        stabilityPool = IStabilityPool(_stabilityPool);
         // Note: frontEndTag is set only once for msg.sender in StabilityPool.sol. Can be zero address.
         frontEndTag = _frontEndTag;
-        uniRouter = ISwapRouter(_uniRouter);
-        lusd = IERC20(_lusd);
-        weth = IERC20(_weth);
-        lqty = IERC20(_lqty);
 
         // Note: StabilityPoolBridge never holds LUSD or LQTY after or before an invocation of any of its functions.
         // For this reason the following is not a security risk and makes the convert() function more gas efficient.
-        require(IERC20(_lusd).approve(_stabilityPool, type(uint256).max), "StabilityPoolBridge: LUSD_APPROVE_FAILED");
-        require(IERC20(_lqty).approve(_uniRouter, type(uint256).max), "StabilityPoolBridge: LQTY_APPROVE_FAILED");
+        require(
+            IERC20(LUSD).approve(address(STABILITY_POOL), type(uint256).max),
+            "StabilityPoolBridge: LUSD_APPROVE_FAILED"
+        );
+        require(
+            IERC20(LQTY).approve(address(UNI_ROUTER), type(uint256).max),
+            "StabilityPoolBridge: LQTY_APPROVE_FAILED"
+        );
     }
 
     /*
@@ -83,20 +78,22 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
     {
         require(msg.sender == rollupProcessorAddr, "StabilityPoolBridge: INVALID_CALLER");
         require(
-            inputAssetA.erc20Address == address(lusd) || inputAssetA.erc20Address == address(this),
+            inputAssetA.erc20Address == LUSD || inputAssetA.erc20Address == address(this),
             "StabilityPoolBridge: INCORRECT_INPUT"
         );
 
-        if (inputAssetA.erc20Address == address(lusd)) {
+        if (inputAssetA.erc20Address == LUSD) {
             // Deposit
             require(
-                lusd.transferFrom(rollupProcessorAddr, address(this), inputValue),
+                IERC20(LUSD).transferFrom(rollupProcessorAddr, address(this), inputValue),
                 "StabilityPoolBridge: DEPOSIT_TRANSFER_FAILED"
             );
             // Rewards are claimed here.
-            stabilityPool.provideToSP(inputValue, frontEndTag);
+            STABILITY_POOL.provideToSP(inputValue, frontEndTag);
             _swapAndDepositRewards(auxData);
-            uint256 totalLUSDOwnedBeforeDeposit = stabilityPool.getCompoundedLUSDDeposit(address(this)).sub(inputValue);
+            uint256 totalLUSDOwnedBeforeDeposit = STABILITY_POOL.getCompoundedLUSDDeposit(address(this)).sub(
+                inputValue
+            );
             // outputValueA = how much SPB should be minted
             if (this.totalSupply() == 0) {
                 // When the totalSupply is 0, I set the SPB/LUSD ratio to be 1.
@@ -110,18 +107,18 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
         } else {
             // Withdrawal
             // Rewards are claimed here.
-            stabilityPool.withdrawFromSP(0);
+            STABILITY_POOL.withdrawFromSP(0);
             _swapAndDepositRewards(auxData);
 
             // stabilityPool.getCompoundedLUSDDeposit(address(this)).div(this.totalSupply()) = how much LUSD is one SPB
             // outputValueA = amount of LUSD to be withdrawn and sent to rollupProcessor
-            outputValueA = stabilityPool.getCompoundedLUSDDeposit(address(this)).mul(inputValue).div(
+            outputValueA = STABILITY_POOL.getCompoundedLUSDDeposit(address(this)).mul(inputValue).div(
                 this.totalSupply()
             );
-            stabilityPool.withdrawFromSP(outputValueA);
+            STABILITY_POOL.withdrawFromSP(outputValueA);
             _burn(rollupProcessorAddr, inputValue);
             require(
-                lusd.transfer(rollupProcessorAddr, outputValueA),
+                IERC20(LUSD).transfer(rollupProcessorAddr, outputValueA),
                 "StabilityPoolBridge: WITHDRAWAL_TRANSFER_FAILED"
             );
         }
@@ -138,49 +135,31 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
         } else {
             _swapRewardsOn1inch();
         }
-        uint256 lusdHeldByBridge = lusd.balanceOf(address(this));
+        uint256 lusdHeldByBridge = IERC20(LUSD).balanceOf(address(this));
         if (lusdHeldByBridge != 0) {
-            stabilityPool.provideToSP(lusdHeldByBridge, frontEndTag);
+            STABILITY_POOL.provideToSP(lusdHeldByBridge, frontEndTag);
         }
     }
 
     function _swapRewardsOnUni() internal {
         uint256 ethBalance = address(this).balance;
         if (ethBalance != 0) {
-            uniRouter.exactInputSingle{value: ethBalance}(
-                ISwapRouter.ExactInputSingleParams(
-                    address(weth),
-                    address(lusd),
-                    3000,
-                    address(this),
-                    block.timestamp,
-                    ethBalance,
-                    0,
-                    0
-                )
+            UNI_ROUTER.exactInputSingle{value: ethBalance}(
+                ISwapRouter.ExactInputSingleParams(WETH, LUSD, 3000, address(this), block.timestamp, ethBalance, 0, 0)
             );
         }
 
-        uint256 lqtyBalance = lqty.balanceOf(address(this));
+        uint256 lqtyBalance = IERC20(LQTY).balanceOf(address(this));
         if (lqtyBalance != 0) {
-            uniRouter.exactInputSingle(
-                ISwapRouter.ExactInputSingleParams(
-                    address(lqty),
-                    address(lusd),
-                    3000,
-                    address(this),
-                    block.timestamp,
-                    lqtyBalance,
-                    0,
-                    0
-                )
+            UNI_ROUTER.exactInputSingle(
+                ISwapRouter.ExactInputSingleParams(LQTY, LUSD, 3000, address(this), block.timestamp, lqtyBalance, 0, 0)
             );
         }
     }
 
     function _swapRewardsOn1inch() internal {
         if (address(this).balance != 0) {}
-        if (lqty.balanceOf(address(this)) != 0) {}
+        if (IERC20(LQTY).balanceOf(address(this)) != 0) {}
     }
 
     function canFinalise(
