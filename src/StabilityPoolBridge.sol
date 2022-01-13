@@ -17,6 +17,7 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
     address public constant LUSD = 0x5f98805A4E8be255a32880FDeC7F6728C6568bA0;
     address public constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     address public constant LQTY = 0x6DEA81C8171D0bA574754EF6F8b412F2Ed88c54D;
+    address public constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48; // set here because of multihop on Uni
 
     IStabilityPool public constant STABILITY_POOL = IStabilityPool(0x66017D22b0f8556afDd19FC67041899Eb65a21bb);
     ISwapRouter public constant UNI_ROUTER = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
@@ -29,8 +30,9 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
         // Note: frontEndTag is set only once for msg.sender in StabilityPool.sol. Can be zero address.
         frontEndTag = _frontEndTag;
 
-        // Note: StabilityPoolBridge never holds LUSD or LQTY after or before an invocation of any of its functions.
-        // For this reason the following is not a security risk and makes the convert() function more gas efficient.
+        // Note: StabilityPoolBridge never holds LUSD, LQTY or USDC after or before an invocation of any of its
+        // functions. For this reason the following is not a security risk and makes the convert() function more gas
+        // efficient.
         require(
             IERC20(LUSD).approve(address(STABILITY_POOL), type(uint256).max),
             "StabilityPoolBridge: LUSD_APPROVE_FAILED"
@@ -38,6 +40,10 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
         require(
             IERC20(LQTY).approve(address(UNI_ROUTER), type(uint256).max),
             "StabilityPoolBridge: LQTY_APPROVE_FAILED"
+        );
+        require(
+            IERC20(USDC).approve(address(UNI_ROUTER), type(uint256).max),
+            "StabilityPoolBridge: USDC_APPROVE_FAILED"
         );
     }
 
@@ -144,8 +150,12 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
     function _swapRewardsOnUni() internal {
         uint256 ethBalance = address(this).balance;
         if (ethBalance != 0) {
-            UNI_ROUTER.exactInputSingle{value: ethBalance}(
-                ISwapRouter.ExactInputSingleParams(WETH, LUSD, 3000, address(this), block.timestamp, ethBalance, 0, 0)
+            // Routing the swap through USDC is consistently the best option (both pairs have only 500 bps fee)
+            uint256 usdcBalance = UNI_ROUTER.exactInputSingle{value: ethBalance}(
+                ISwapRouter.ExactInputSingleParams(WETH, USDC, 500, address(this), block.timestamp, ethBalance, 0, 0)
+            );
+            UNI_ROUTER.exactInputSingle(
+                ISwapRouter.ExactInputSingleParams(USDC, LUSD, 500, address(this), block.timestamp, usdcBalance, 0, 0)
             );
         }
 
