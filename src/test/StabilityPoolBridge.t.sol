@@ -28,13 +28,13 @@ contract StabilityPoolBridgeTest is TestUtil {
         );
     }
 
-    function test_initialERC20Params() public {
+    function testInitialERC20Params() public {
         assertEq(stabilityPoolBridge.name(), "StabilityPoolBridge");
         assertEq(stabilityPoolBridge.symbol(), "SPB");
         assertEq(uint256(stabilityPoolBridge.decimals()), 18);
     }
 
-    function test_fullDepositWithdrawalFlow() public {
+    function testFullDepositWithdrawalFlow() public {
         // I will deposit and withdraw 1 million LUSD
         uint256 depositAmount = 10**6 * WAD;
 

@@ -66,7 +66,7 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
     function convert(
         Types.AztecAsset calldata inputAssetA,
         Types.AztecAsset calldata,
-        Types.AztecAsset calldata outputAssetA,
+        Types.AztecAsset calldata,
         Types.AztecAsset calldata,
         uint256 inputValue,
         uint256,
@@ -115,7 +115,7 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
 
             // stabilityPool.getCompoundedLUSDDeposit(address(this)).div(this.totalSupply()) = how much LUSD is one SPB
             // outputValueA = amount of LUSD to be withdrawn and sent to rollupProcessor
-            uint256 outputValueA = stabilityPool.getCompoundedLUSDDeposit(address(this)).mul(inputValue).div(
+            outputValueA = stabilityPool.getCompoundedLUSDDeposit(address(this)).mul(inputValue).div(
                 this.totalSupply()
             );
             stabilityPool.withdrawFromSP(outputValueA);
@@ -197,6 +197,6 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
         uint256,
         uint64
     ) external payable override returns (uint256, uint256) {
-        require(false);
+        require(false, "StabilityPoolBridge: ASYNC_MODE_DISABLED");
     }
 }

@@ -18,16 +18,16 @@ interface Hevm {
 contract TestUtil is DSTest {
     using SafeMath for uint256;
 
-    Hevm hevm;
+    Hevm internal hevm;
 
-    uint256 constant WAD = 10**18;
+    uint256 internal constant WAD = 10**18;
 
     struct Token {
         address addr; // ERC20 Mainnet address
         uint256 slot; // Balance storage slot
     }
 
-    mapping(bytes32 => Token) tokens;
+    mapping(bytes32 => Token) internal tokens;
 
     constructor() public {
         hevm = Hevm(address(bytes20(uint160(uint256(keccak256("hevm cheat code"))))));
