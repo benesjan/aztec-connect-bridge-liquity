@@ -1,6 +1,7 @@
+source .env
+
 # Make dependencies available
 export DAPP_REMAPPINGS=$(cat remappings.txt)
-export ETH_RPC_URL=http://localhost:8545/
 
 export DAPP_SOLC_VERSION=0.6.11
 # If you're getting an "invalid character at offset" error, comment this out.

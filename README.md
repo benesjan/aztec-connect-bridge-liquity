@@ -4,6 +4,7 @@
 
 1. Install dapp.tools
 2. `yarn`
-3. set ETH_RPC_URL in .dapprc
-4. `dapp build`
-5. `dapp test --rpc`
+3. `cp .env.example .env`
+4. Set variables in .env
+5. `dapp build`
+6. `dapp test --rpc`
