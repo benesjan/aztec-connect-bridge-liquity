@@ -8,6 +8,7 @@ import "../lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 
 import "./interfaces/IStabilityPool.sol";
 import "./interfaces/IDefiBridge.sol";
+import "./interfaces/IWETH.sol";
 import "./Types.sol";
 import "./interfaces/ISwapRouter.sol";
 
@@ -30,12 +31,16 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
         // Note: frontEndTag is set only once for msg.sender in StabilityPool.sol. Can be zero address.
         frontEndTag = _frontEndTag;
 
-        // Note: StabilityPoolBridge never holds LUSD, LQTY or USDC after or before an invocation of any of its
+        // Note: StabilityPoolBridge never holds LUSD, LQTY, USDC or WETH after or before an invocation of any of its
         // functions. For this reason the following is not a security risk and makes the convert() function more gas
         // efficient.
         require(
             IERC20(LUSD).approve(address(STABILITY_POOL), type(uint256).max),
             "StabilityPoolBridge: LUSD_APPROVE_FAILED"
+        );
+        require(
+            IERC20(WETH).approve(address(UNI_ROUTER), type(uint256).max),
+            "StabilityPoolBridge: WETH_APPROVE_FAILED"
         );
         require(
             IERC20(LQTY).approve(address(UNI_ROUTER), type(uint256).max),
@@ -141,35 +146,43 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
         } else {
             _swapRewardsOn1inch();
         }
-        uint256 lusdHeldByBridge = IERC20(LUSD).balanceOf(address(this));
-        if (lusdHeldByBridge != 0) {
-            STABILITY_POOL.provideToSP(lusdHeldByBridge, frontEndTag);
+        uint256 lusdBalance = IERC20(LUSD).balanceOf(address(this));
+        if (lusdBalance != 0) {
+            STABILITY_POOL.provideToSP(lusdBalance, frontEndTag);
         }
     }
 
     function _swapRewardsOnUni() internal {
+        // Note: The best route for LQTY -> LUSD is consistently LQTY -> WETH -> USDC -> LUSD. Since I want to swap
+        // liquidations rewards (ETH) to LUSD as well, I will first swap LQTY to WETH and then swap it all through
+        // USDC to LUSD
+
+        uint256 lqtyBalance = IERC20(LQTY).balanceOf(address(this));
+        if (lqtyBalance != 0) {
+            UNI_ROUTER.exactInputSingle(
+                ISwapRouter.ExactInputSingleParams(LQTY, WETH, 3000, address(this), block.timestamp, lqtyBalance, 0, 0)
+            );
+        }
+
         uint256 ethBalance = address(this).balance;
         if (ethBalance != 0) {
-            // Routing the swap through USDC is consistently the best option (both pairs have only 500 bps fee)
-            uint256 usdcBalance = UNI_ROUTER.exactInputSingle{value: ethBalance}(
-                ISwapRouter.ExactInputSingleParams(WETH, USDC, 500, address(this), block.timestamp, ethBalance, 0, 0)
+            // Wrap ETH in WETH
+            IWETH(WETH).deposit{value: ethBalance}();
+        }
+
+        uint256 wethBalance = IERC20(WETH).balanceOf(address(this));
+        if (wethBalance != 0) {
+            uint256 usdcBalance = UNI_ROUTER.exactInputSingle(
+                ISwapRouter.ExactInputSingleParams(WETH, USDC, 500, address(this), block.timestamp, wethBalance, 0, 0)
             );
             UNI_ROUTER.exactInputSingle(
                 ISwapRouter.ExactInputSingleParams(USDC, LUSD, 500, address(this), block.timestamp, usdcBalance, 0, 0)
             );
         }
-
-        uint256 lqtyBalance = IERC20(LQTY).balanceOf(address(this));
-        if (lqtyBalance != 0) {
-            UNI_ROUTER.exactInputSingle(
-                ISwapRouter.ExactInputSingleParams(LQTY, LUSD, 3000, address(this), block.timestamp, lqtyBalance, 0, 0)
-            );
-        }
     }
 
     function _swapRewardsOn1inch() internal {
-        if (address(this).balance != 0) {}
-        if (IERC20(LQTY).balanceOf(address(this)) != 0) {}
+        require(false, "StabilityPoolBridge: NOT_IMPLEMENTED");
     }
 
     function canFinalise(
