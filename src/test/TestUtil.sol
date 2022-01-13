@@ -61,4 +61,9 @@ contract TestUtil is DSTest {
         assertEq(IERC20(addr).balanceOf(account), bal + amt);
         // Assert new balance
     }
+
+    function rand(uint256 seed) public pure returns (uint256) {
+        // I want a number between 1 WAD and 10 million WAD
+        return uint256(keccak256(abi.encodePacked(seed))) % 10**25;
+    }
 }
