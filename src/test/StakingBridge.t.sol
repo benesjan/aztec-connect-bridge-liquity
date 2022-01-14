@@ -74,7 +74,7 @@ contract StakingBridgeTest is TestUtil {
         uint256 depositAmount = 203;
 
         uint256 numIters = 10;
-        uint256[] memory spbBalances = new uint256[](numIters);
+        uint256[] memory sbBalances = new uint256[](numIters);
 
         while (i < numIters) {
             depositAmount = rand(depositAmount);
@@ -88,7 +88,7 @@ contract StakingBridgeTest is TestUtil {
             IERC20(tokens["LQTY"].addr).approve(address(bridge), depositAmount);
 
             // 4. Deposit LQTY to Staking through the bridge
-            (uint256 spbBalance, uint256 _, bool __) = bridge.convert(
+            (uint256 outputValueA, , ) = bridge.convert(
                 Types.AztecAsset(1, tokens["LQTY"].addr, Types.AztecAssetType.ERC20),
                 Types.AztecAsset(0, address(0), Types.AztecAssetType.NOT_USED),
                 Types.AztecAsset(2, address(bridge), Types.AztecAssetType.ERC20),
@@ -98,7 +98,7 @@ contract StakingBridgeTest is TestUtil {
                 0
             );
 
-            spbBalances[i] = spbBalance;
+            sbBalances[i] = outputValueA;
             i++;
         }
 
@@ -110,7 +110,7 @@ contract StakingBridgeTest is TestUtil {
                 Types.AztecAsset(0, address(0), Types.AztecAssetType.NOT_USED),
                 Types.AztecAsset(1, tokens["LQTY"].addr, Types.AztecAssetType.ERC20),
                 Types.AztecAsset(0, address(0), Types.AztecAssetType.NOT_USED),
-                spbBalances[i],
+                sbBalances[i],
                 0,
                 0
             );

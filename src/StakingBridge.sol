@@ -170,5 +170,6 @@ contract StakingBridge is IDefiBridge, ERC20("StakingBridge", "SB") {
     }
 
     receive() external payable {}
+
     fallback() external payable {}
 }

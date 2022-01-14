@@ -91,7 +91,7 @@ contract StabilityPoolBridgeTest is TestUtil {
             IERC20(tokens["LUSD"].addr).approve(address(bridge), depositAmount);
 
             // 4. Deposit LUSD to StabilityPool through the bridge
-            (uint256 spbBalance, uint256 _, bool __) = bridge.convert(
+            (uint256 outputValueA, , ) = bridge.convert(
                 Types.AztecAsset(1, tokens["LUSD"].addr, Types.AztecAssetType.ERC20),
                 Types.AztecAsset(0, address(0), Types.AztecAssetType.NOT_USED),
                 Types.AztecAsset(2, address(bridge), Types.AztecAssetType.ERC20),
@@ -101,7 +101,7 @@ contract StabilityPoolBridgeTest is TestUtil {
                 0
             );
 
-            spbBalances[i] = spbBalance;
+            spbBalances[i] = outputValueA;
             i++;
         }
 
