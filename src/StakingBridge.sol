@@ -26,12 +26,9 @@ contract StakingBridge is IDefiBridge, ERC20("StakingBridge", "SB") {
     uint256 public lqtyBalance = 0;
 
     address public immutable rollupProcessor;
-    address public immutable frontEndTag; // see StabilityPool.sol for details
 
-    constructor(address _rollupProcessor, address _frontEndTag) public {
+    constructor(address _rollupProcessor) public {
         rollupProcessor = _rollupProcessor;
-        // Note: frontEndTag is set only once for msg.sender in StabilityPool.sol. Can be zero address.
-        frontEndTag = _frontEndTag;
 
         // Note: StakingBridge never holds LUSD, LQTY, USDC or WETH after or before an invocation of any of its
         // functions. For this reason the following is not a security risk and makes the convert() function more gas
@@ -86,8 +83,8 @@ contract StakingBridge is IDefiBridge, ERC20("StakingBridge", "SB") {
                 IERC20(LQTY).transferFrom(rollupProcessor, address(this), inputValue),
                 "StakingBridge: DEPOSIT_TRANSFER_FAILED"
             );
-            // Claim rewards
-            STAKING_CONTRACT.unstake(0);
+            // Deposit and claim rewards
+            STAKING_CONTRACT.stake(inputValue);
             uint256 rewardInLQTY = _swapRewardsToLQTY();
             uint256 totalLQTYOwnedBeforeDeposit = lqtyBalance.add(rewardInLQTY);
             // outputValueA = how much SB should be minted
@@ -99,20 +96,14 @@ contract StakingBridge is IDefiBridge, ERC20("StakingBridge", "SB") {
                 // When I multiply this ^ with the amount of LQTY deposited I get the amount of SB to be minted.
                 outputValueA = this.totalSupply().mul(inputValue).div(totalLQTYOwnedBeforeDeposit);
             }
-            uint256 depositAmount = inputValue.add(rewardInLQTY);
-            STAKING_CONTRACT.stake(depositAmount);
             _mint(rollupProcessor, outputValueA);
-            lqtyBalance = lqtyBalance.add(depositAmount);
+            lqtyBalance = totalLQTYOwnedBeforeDeposit.add(inputValue);
         } else {
             // Withdrawal
             // Claim rewards
             STAKING_CONTRACT.unstake(0);
             uint256 rewardInLQTY = _swapRewardsToLQTY();
-            if (rewardInLQTY != 0) {
-                // Stake the reward
-                STAKING_CONTRACT.stake(rewardInLQTY);
-                lqtyBalance = lqtyBalance.add(rewardInLQTY);
-            }
+            lqtyBalance = lqtyBalance.add(rewardInLQTY);
 
             // lqtyBalance.div(this.totalSupply()) = how much LQTY is one SB
             // outputValueA = amount of LQTY to be withdrawn and sent to rollupProcessor
@@ -155,6 +146,9 @@ contract StakingBridge is IDefiBridge, ERC20("StakingBridge", "SB") {
             amountLQTYOut = UNI_ROUTER.exactInputSingle(
                 ISwapRouter.ExactInputSingleParams(WETH, LQTY, 3000, address(this), block.timestamp, wethBalance, 0, 0)
             );
+            if (amountLQTYOut != 0) {
+                STAKING_CONTRACT.stake(amountLQTYOut);
+            }
         }
     }
 
@@ -174,4 +168,7 @@ contract StakingBridge is IDefiBridge, ERC20("StakingBridge", "SB") {
     ) external payable override returns (uint256, uint256) {
         require(false, "StakingBridge: ASYNC_MODE_DISABLED");
     }
+
+    receive() external payable {}
+    fallback() external payable {}
 }
