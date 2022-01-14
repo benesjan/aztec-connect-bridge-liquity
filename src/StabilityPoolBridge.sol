@@ -23,11 +23,11 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
     IStabilityPool public constant STABILITY_POOL = IStabilityPool(0x66017D22b0f8556afDd19FC67041899Eb65a21bb);
     ISwapRouter public constant UNI_ROUTER = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
 
-    address public immutable rollupProcessorAddr;
+    address public immutable rollupProcessor;
     address public immutable frontEndTag; // see StabilityPool.sol for details
 
     constructor(address _rollupProcessor, address _frontEndTag) public {
-        rollupProcessorAddr = _rollupProcessor;
+        rollupProcessor = _rollupProcessor;
         // Note: frontEndTag is set only once for msg.sender in StabilityPool.sol. Can be zero address.
         frontEndTag = _frontEndTag;
 
@@ -87,7 +87,7 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
             bool isAsync
         )
     {
-        require(msg.sender == rollupProcessorAddr, "StabilityPoolBridge: INVALID_CALLER");
+        require(msg.sender == rollupProcessor, "StabilityPoolBridge: INVALID_CALLER");
         require(
             inputAssetA.erc20Address == LUSD || inputAssetA.erc20Address == address(this),
             "StabilityPoolBridge: INCORRECT_INPUT"
@@ -96,7 +96,7 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
         if (inputAssetA.erc20Address == LUSD) {
             // Deposit
             require(
-                IERC20(LUSD).transferFrom(rollupProcessorAddr, address(this), inputValue),
+                IERC20(LUSD).transferFrom(rollupProcessor, address(this), inputValue),
                 "StabilityPoolBridge: DEPOSIT_TRANSFER_FAILED"
             );
             // Rewards are claimed here.
@@ -114,7 +114,7 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
                 // When I multiply this ^ with the amount of LUSD deposited I get the amount of SPB to be minted.
                 outputValueA = this.totalSupply().mul(inputValue).div(totalLUSDOwnedBeforeDeposit);
             }
-            _mint(rollupProcessorAddr, outputValueA);
+            _mint(rollupProcessor, outputValueA);
         } else {
             // Withdrawal
             // Rewards are claimed here.
@@ -127,9 +127,9 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
                 this.totalSupply()
             );
             STABILITY_POOL.withdrawFromSP(outputValueA);
-            _burn(rollupProcessorAddr, inputValue);
+            _burn(rollupProcessor, inputValue);
             require(
-                IERC20(LUSD).transfer(rollupProcessorAddr, outputValueA),
+                IERC20(LUSD).transfer(rollupProcessor, outputValueA),
                 "StabilityPoolBridge: WITHDRAWAL_TRANSFER_FAILED"
             );
         }
