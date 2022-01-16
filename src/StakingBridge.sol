@@ -103,11 +103,12 @@ contract StakingBridge is IDefiBridge, ERC20("StakingBridge", "SB") {
             // Claim rewards
             STAKING_CONTRACT.unstake(0);
             uint256 rewardInLQTY = _swapRewardsToLQTY();
-            lqtyBalance = lqtyBalance.add(rewardInLQTY);
+            uint256 _lqtyBalance = lqtyBalance.add(rewardInLQTY);
 
-            // lqtyBalance.div(this.totalSupply()) = how much LQTY is one SB
+            // _lqtyBalance.div(this.totalSupply()) = how much LQTY is one SB
             // outputValueA = amount of LQTY to be withdrawn and sent to rollupProcessor
-            outputValueA = lqtyBalance.mul(inputValue).div(this.totalSupply());
+            outputValueA = _lqtyBalance.mul(inputValue).div(this.totalSupply());
+            lqtyBalance = _lqtyBalance.sub(outputValueA);
             STAKING_CONTRACT.unstake(outputValueA);
             _burn(rollupProcessor, inputValue);
             require(IERC20(LQTY).transfer(rollupProcessor, outputValueA), "StakingBridge: WITHDRAWAL_TRANSFER_FAILED");
