@@ -18,22 +18,17 @@ contract StakingBridgeTestInternal is TestUtil, StakingBridge(address(0)) {
         // This makes swapping through Uni v3 slow as it has the loop through the ticks for many seconds
         address(0).transfer(address(this).balance - 1 ether);
 
-        uint256 lqtyBalanceBefore = IERC20(tokens["LUSD"].addr).balanceOf(address(STAKING_CONTRACT));
+        uint256 stakedLQTYBeforeSwap = STAKING_CONTRACT.stakes(address(this));
+        _swapRewardsToLQTYAndStake();
+        uint256 stakedLQTYAfterSwap = STAKING_CONTRACT.stakes(address(this));
 
-        uint amountLQTYOut = _swapRewardsToLQTY();
+        // Verify that rewards were swapped for non-zero amount and correctly staked
+        assertGt(stakedLQTYAfterSwap, stakedLQTYBeforeSwap);
 
-        // Verify that rewards were swapped for non-zero amount
-        assertGt(amountLQTYOut, 0);
-
-        uint256 lqtyBalanceAfter = IERC20(tokens["LUSD"].addr).balanceOf(address(STAKING_CONTRACT));
-
-        // Verify that all the rewards were swapped
+        // Verify that all the rewards were swapped and staked
         assertEq(IERC20(tokens["WETH"].addr).balanceOf(address(this)), 0);
         assertEq(IERC20(tokens["LUSD"].addr).balanceOf(address(this)), 0);
         assertEq(IERC20(tokens["LQTY"].addr).balanceOf(address(this)), 0);
         assertEq(address(this).balance, 0);
-
-        // Verify that LQTY was correctly deposited
-//        assertGt(lqtyBalanceAfter, lqtyBalanceBefore);
     }
 }
