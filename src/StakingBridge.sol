@@ -23,8 +23,6 @@ contract StakingBridge is IDefiBridge, ERC20("StakingBridge", "SB") {
     ILQTYStaking public constant STAKING_CONTRACT = ILQTYStaking(0x4f9Fbb3f1E99B56e0Fe2892e623Ed36A76Fc605d);
     ISwapRouter public constant UNI_ROUTER = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
 
-    uint256 public lqtyBalance = 0;
-
     address public immutable rollupProcessor;
 
     constructor(address _rollupProcessor) public {
@@ -85,30 +83,27 @@ contract StakingBridge is IDefiBridge, ERC20("StakingBridge", "SB") {
             );
             // Deposit and claim rewards
             STAKING_CONTRACT.stake(inputValue);
-            uint256 rewardInLQTY = _swapRewardsToLQTY();
-            uint256 totalLQTYOwnedBeforeDeposit = lqtyBalance.add(rewardInLQTY);
+            _swapRewardsToLQTYAndStake();
             // outputValueA = how much SB should be minted
             if (this.totalSupply() == 0) {
                 // When the totalSupply is 0, I set the SB/LQTY ratio to be 1.
                 outputValueA = inputValue;
             } else {
+                uint256 totalLQTYOwnedBeforeDeposit = STAKING_CONTRACT.stakes(address(this)).sub(inputValue);
                 // this.totalSupply().div(totalLQTYOwnedBeforeDeposit) = how much SB one LQTY is worth
                 // When I multiply this ^ with the amount of LQTY deposited I get the amount of SB to be minted.
                 outputValueA = this.totalSupply().mul(inputValue).div(totalLQTYOwnedBeforeDeposit);
             }
             _mint(rollupProcessor, outputValueA);
-            lqtyBalance = totalLQTYOwnedBeforeDeposit.add(inputValue);
         } else {
             // Withdrawal
             // Claim rewards
             STAKING_CONTRACT.unstake(0);
-            uint256 rewardInLQTY = _swapRewardsToLQTY();
-            uint256 _lqtyBalance = lqtyBalance.add(rewardInLQTY);
+            _swapRewardsToLQTYAndStake();
 
-            // _lqtyBalance.div(this.totalSupply()) = how much LQTY is one SB
+            // STAKING_CONTRACT.stakes(address(this)).div(this.totalSupply()) = how much LQTY is one SB
             // outputValueA = amount of LQTY to be withdrawn and sent to rollupProcessor
-            outputValueA = _lqtyBalance.mul(inputValue).div(this.totalSupply());
-            lqtyBalance = _lqtyBalance.sub(outputValueA);
+            outputValueA = STAKING_CONTRACT.stakes(address(this)).mul(inputValue).div(this.totalSupply());
             STAKING_CONTRACT.unstake(outputValueA);
             _burn(rollupProcessor, inputValue);
             require(IERC20(LQTY).transfer(rollupProcessor, outputValueA), "StakingBridge: WITHDRAWAL_TRANSFER_FAILED");
@@ -118,14 +113,12 @@ contract StakingBridge is IDefiBridge, ERC20("StakingBridge", "SB") {
     }
 
     /*
-     * Swaps any ETH and LUSD currently held by the contract to LQTY.
+     * Swaps any ETH and LUSD currently held by the contract to LQTY and stakes them to STAKING_CONTRACT.
      */
-    function _swapRewardsToLQTY() internal returns (uint256 amountLQTYOut) {
+    function _swapRewardsToLQTYAndStake() internal {
         // Note: The best route for LUSD -> LQTY is consistently LUSD -> USDC -> WETH -> LQTY. Since I want to swap
         // liquidation rewards (ETH) to LQTY as well, I will first swap LUSD to WETH through USDC and then swap it all
         // to LQTY
-        amountLQTYOut = 0;
-
         uint256 lusdBalance = IERC20(LUSD).balanceOf(address(this));
         if (lusdBalance != 0) {
             uint256 usdcBalance = UNI_ROUTER.exactInputSingle(
@@ -144,7 +137,7 @@ contract StakingBridge is IDefiBridge, ERC20("StakingBridge", "SB") {
 
         uint256 wethBalance = IERC20(WETH).balanceOf(address(this));
         if (wethBalance != 0) {
-            amountLQTYOut = UNI_ROUTER.exactInputSingle(
+            uint256 amountLQTYOut = UNI_ROUTER.exactInputSingle(
                 ISwapRouter.ExactInputSingleParams(WETH, LQTY, 3000, address(this), block.timestamp, wethBalance, 0, 0)
             );
             if (amountLQTYOut != 0) {

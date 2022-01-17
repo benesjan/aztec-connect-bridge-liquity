@@ -49,7 +49,7 @@ contract StakingBridgeTest is TestUtil {
         assertEq(bridge.balanceOf(address(this)), depositAmount);
 
         // 6. Check the LQTY balance of StakingBridge in Staking is equal to the amount of LQTY deposited
-        assertEq(bridge.lqtyBalance(), depositAmount);
+        assertEq(bridge.STAKING_CONTRACT().stakes(address(bridge)), depositAmount);
 
         // 7. Withdraw LQTY from Staking through the bridge
         bridge.convert(
