@@ -18,12 +18,17 @@ contract StabilityPoolBridgeTestInternal is TestUtil, StabilityPoolBridge(addres
         // This makes swapping through Uni v3 slow as it has the loop through the ticks for many seconds
         address(0).transfer(address(this).balance - 1 ether);
 
-        _swapRewardsOnUni();
+        uint256 depositedLUSDBeforeSwap = STABILITY_POOL.getCompoundedLUSDDeposit(address(this));
+        _swapRewardsOnUniAndDeposit();
+        uint256 depositedLUSDAfterSwap = STABILITY_POOL.getCompoundedLUSDDeposit(address(this));
+
+        // Verify that rewards were swapped for non-zero amount and correctly staked
+        assertGt(depositedLUSDAfterSwap, depositedLUSDBeforeSwap);
 
         // Verify that all the rewards were swapped to LUSD
         assertEq(IERC20(tokens["WETH"].addr).balanceOf(address(this)), 0);
         assertEq(IERC20(tokens["LQTY"].addr).balanceOf(address(this)), 0);
-        assertGt(IERC20(tokens["LUSD"].addr).balanceOf(address(this)), 0);
+        assertEq(IERC20(tokens["LUSD"].addr).balanceOf(address(this)), 0);
         assertEq(address(this).balance, 0);
     }
 }
