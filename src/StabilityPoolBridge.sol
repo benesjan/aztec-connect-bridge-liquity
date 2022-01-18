@@ -12,6 +12,25 @@ import "./interfaces/IWETH.sol";
 import "./Types.sol";
 import "./interfaces/ISwapRouter.sol";
 
+/**
+ * @title Aztec Connect Bridge for Liquity's Stability Pool
+ * @author Jan Benes
+ * @notice You can use this contract to deposit and withdraw LUSD to and from Liquity's Stability Pool contract.
+ * @dev Implementation of the IDefiBridge interface for StabilityPool from Liquity protocol.
+ *
+ * The contract inherits from OpenZeppelin's implementation of ERC20 token because token balances are used to track
+ * the depositor's ownership of the assets controlled by the bridge contract. During first deposits equal amount of
+ * bridge tokens (In this case - SPB tokens) is minted as the amount of LUSD deposited - 1 SPB is worth 1 LUSD.  1 SPB
+ * token stops being worth 1 LUSD once rewards are claimed. There are 2 types of rewards in the StabilityPool: 1) ETH
+ * from liquidations, 2) LQTY from early adopter rewards.
+ *
+ * See https://docs.liquity.org/faq/stability-pool-and-liquidations#how-do-i-benefit-as-a-stability-provider-from-liquidations[Liquity docs]
+ * for more details.
+ *
+ * Rewards are automatically claimed and swapped to LUSD before each deposit and withdrawal. This allows for precise
+ * computation of how much each SPB is worth.
+ *
+ */
 contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB") {
     using SafeMath for uint256;
 
@@ -26,6 +45,9 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
     address public immutable rollupProcessor;
     address public immutable frontEndTag; // see StabilityPool.sol for details
 
+    /// @notice Set addresses and token approvals.
+    /// @param _rollupProcessor Address of the RollupProcessor.sol
+    /// @param _frontEndTag See https://docs.liquity.org/faq/frontend-operators#how-do-frontend-tags-work[Liquity docs]
     constructor(address _rollupProcessor, address _frontEndTag) public {
         rollupProcessor = _rollupProcessor;
         // Note: frontEndTag is set only once for msg.sender in StabilityPool.sol. Can be zero address.
