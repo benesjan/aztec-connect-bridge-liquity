@@ -28,13 +28,10 @@ contract StabilityPoolBridgeTest is TestUtil {
         // I will deposit and withdraw 1 million LUSD
         uint256 depositAmount = 10**6 * WAD;
 
-        // 1. mint LUSD to this contract
-        mint("LUSD", address(this), depositAmount);
+        // 1. Mint the deposit amount of LUSD to the bridge
+        mint("LUSD", address(bridge), depositAmount);
 
-        // 2. Allow StabilityPoolBridge to spend LUSD of this
-        IERC20(tokens["LUSD"].addr).approve(address(bridge), depositAmount);
-
-        // 3. Deposit LUSD to StabilityPool through the bridge
+        // 2. Deposit LUSD to the StabilityPool contract through the bridge
         bridge.convert(
             Types.AztecAsset(1, tokens["LUSD"].addr, Types.AztecAssetType.ERC20),
             Types.AztecAsset(0, address(0), Types.AztecAssetType.NOT_USED),
@@ -45,30 +42,40 @@ contract StabilityPoolBridgeTest is TestUtil {
             0
         );
 
-        // 4. Check the total supply of SPB token is equal to the amount of LUSD deposited
+        // 3. Check the total supply of SPB token is equal to the amount of LUSD deposited
         assertEq(bridge.totalSupply(), depositAmount);
 
-        // 5. Check the SPB balance of this is equal to the amount of LUSD deposited
+        // 4. Check the SPB balance of this is equal to the amount of LUSD deposited
         assertEq(bridge.balanceOf(address(this)), depositAmount);
 
-        // 6. Check the LUSD balance of StabilityPoolBridge in StabilityPool is equal to the amount of LUSD deposited
+        // 5. Check the LUSD balance of the StabilityPoolBridge in the StabilityPool contract is equal to the amount
+        // of LUSD deposited
         assertEq(bridge.STABILITY_POOL().getCompoundedLUSDDeposit(address(bridge)), depositAmount);
 
-        // 7. Withdraw LUSD from StabilityPool through the bridge
+        // 6. withdrawAmount is equal to depositAmount because there were no rewards claimed -> LUSD/SPB ratio stayed 1
+        uint256 withdrawAmount = depositAmount;
+
+        // 7. Transfer the withdraw amount of SPB to the bridge
+        require(
+            IERC20(address(bridge)).transfer(address(bridge), withdrawAmount),
+            "StabilityPoolBridgeTest: WITHDRAW_TRANSFER_FAILED"
+        );
+
+        // 8. Withdraw LUSD from StabilityPool through the bridge
         bridge.convert(
             Types.AztecAsset(2, address(bridge), Types.AztecAssetType.ERC20),
             Types.AztecAsset(0, address(0), Types.AztecAssetType.NOT_USED),
             Types.AztecAsset(1, tokens["LUSD"].addr, Types.AztecAssetType.ERC20),
             Types.AztecAsset(0, address(0), Types.AztecAssetType.NOT_USED),
-            depositAmount,
+            withdrawAmount,
             0,
             0
         );
 
-        // 8. Check the total supply of SPB token is 0
+        // 9. Check the total supply of SPB token is 0
         assertEq(bridge.totalSupply(), 0);
 
-        // 9. Check the LUSD balance of this contract is equal to the initial LUSD deposit
+        // 10. Check the LUSD balance of this contract is equal to the initial LUSD deposit
         assertEq(IERC20(tokens["LUSD"].addr).balanceOf(address(this)), depositAmount);
     }
 
@@ -81,16 +88,13 @@ contract StabilityPoolBridgeTest is TestUtil {
 
         while (i < numIters) {
             depositAmount = rand(depositAmount);
-            // 1. mint LUSD to this contract
-            mint("LUSD", address(this), depositAmount);
-            // 2. mint rewards to bridge
+            // 1. Mint deposit amount of LUSD to the bridge
+            mint("LUSD", address(bridge), depositAmount);
+            // 2. Mint rewards to the bridge
             mint("LQTY", address(bridge), 100 * WAD);
             mint("WETH", address(bridge), 1 * WAD);
 
-            // 3. Allow StabilityPoolBridge to spend LUSD of this
-            IERC20(tokens["LUSD"].addr).approve(address(bridge), depositAmount);
-
-            // 4. Deposit LUSD to StabilityPool through the bridge
+            // 3. Deposit LUSD to StabilityPool through the bridge
             (uint256 outputValueA, , ) = bridge.convert(
                 Types.AztecAsset(1, tokens["LUSD"].addr, Types.AztecAssetType.ERC20),
                 Types.AztecAsset(0, address(0), Types.AztecAssetType.NOT_USED),
@@ -107,13 +111,20 @@ contract StabilityPoolBridgeTest is TestUtil {
 
         i = 0;
         while (i < numIters) {
+            uint256 withdrawAmount = spbBalances[i];
+            // 4. Transfer the withdraw amount of SPB to the bridge
+            require(
+                IERC20(address(bridge)).transfer(address(bridge), withdrawAmount),
+                "StabilityPoolBridgeTest: WITHDRAW_TRANSFER_FAILED"
+            );
+
             // 5. Withdraw LUSD from StabilityPool through the bridge
             bridge.convert(
                 Types.AztecAsset(2, address(bridge), Types.AztecAssetType.ERC20),
                 Types.AztecAsset(0, address(0), Types.AztecAssetType.NOT_USED),
                 Types.AztecAsset(1, tokens["LUSD"].addr, Types.AztecAssetType.ERC20),
                 Types.AztecAsset(0, address(0), Types.AztecAssetType.NOT_USED),
-                spbBalances[i],
+                withdrawAmount,
                 0,
                 0
             );

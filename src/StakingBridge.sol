@@ -76,11 +76,6 @@ contract StakingBridge is IDefiBridge, ERC20("StakingBridge", "SB") {
         );
 
         if (inputAssetA.erc20Address == LQTY) {
-            // Deposit
-            require(
-                IERC20(LQTY).transferFrom(rollupProcessor, address(this), inputValue),
-                "StakingBridge: DEPOSIT_TRANSFER_FAILED"
-            );
             // Deposit and claim rewards
             STAKING_CONTRACT.stake(inputValue);
             _swapRewardsToLQTYAndStake();
@@ -105,7 +100,7 @@ contract StakingBridge is IDefiBridge, ERC20("StakingBridge", "SB") {
             // outputValueA = amount of LQTY to be withdrawn and sent to rollupProcessor
             outputValueA = STAKING_CONTRACT.stakes(address(this)).mul(inputValue).div(this.totalSupply());
             STAKING_CONTRACT.unstake(outputValueA);
-            _burn(rollupProcessor, inputValue);
+            _burn(address(this), inputValue);
             require(IERC20(LQTY).transfer(rollupProcessor, outputValueA), "StakingBridge: WITHDRAWAL_TRANSFER_FAILED");
         }
 
