@@ -12,6 +12,24 @@ import "./Types.sol";
 import "./interfaces/ISwapRouter.sol";
 import "./interfaces/ILQTYStaking.sol";
 
+/**
+ * @title Aztec Connect Bridge for Liquity's LQTYStaking.sol
+ * @author Jan Benes (@benesjan on Github and Telegram)
+ * @notice You can use this contract to stake and unstake LQRTY to and from LQTY staking contract.
+ * @dev Implementation of the IDefiBridge interface for LQTYStaking.sol from Liquity protocol.
+ *
+ * The contract inherits from OpenZeppelin's implementation of ERC20 token because token balances are used to track
+ * the depositor's ownership of the assets controlled by the bridge contract. The token is called LQTYStaking and
+ * the token symbol is SB. During the first deposits an equal amount of SB tokens is minted as the amount of LQTY
+ * deposited - 1 SB is worth 1 LQTY.  1 SB token stops being worth 1 LQTY once rewards are claimed. There are 2 types
+ * of rewards in the LQTYStaking.sol: LUSD and ETH (see https://docs.liquity.org/faq/staking[Liquity docs] for more
+ * details).
+ *
+ * Rewards are automatically claimed and swapped to LQTY before staking and unstaking. This allows for precise
+ * computation of how much each SB is worth in terms of LQTY.
+ *
+ * Note: StakingBridge.sol is very similar to StabilityPoolBridge.sol.
+ */
 contract StakingBridge is IDefiBridge, ERC20("StakingBridge", "SB") {
     using SafeMath for uint256;
 
@@ -25,6 +43,10 @@ contract StakingBridge is IDefiBridge, ERC20("StakingBridge", "SB") {
 
     address public immutable rollupProcessor;
 
+    /**
+     * @notice Set the addresses of RollupProcessor.sol and token approvals.
+     * @param _rollupProcessor Address of the RollupProcessor.sol
+     */
     constructor(address _rollupProcessor) public {
         rollupProcessor = _rollupProcessor;
 
@@ -51,10 +73,22 @@ contract StakingBridge is IDefiBridge, ERC20("StakingBridge", "SB") {
     * outputAssetA - LQTY
     * inputValue - the amount of StakingBridge ERC20
     */
+    /**
+     * @notice Function which stakes or unstakes LQTY to/from LQTYStaking.sol.
+     * @dev This method can only be called from the RollupProcessor.sol. If the input asset is LQTY, staking flow is
+     * executed. If SB, unstaking. RollupProcessor.sol has to transfer the tokens to the bridge before calling
+     * the method. If this is not the case, the function will revert (either in STAKING_CONTRACT.stake(...) or during
+     * SB burn).
+     *
+     * @param inputAssetA - LQTY (Staking) or SB (Unstaking)
+     * @param outputAssetA - SB (Staking) or LQTY (Unstaking)
+     * @param inputValue - the amount of LQTY to stake or the amount of SB to burn and exchange for LQTY
+     * @return outputValueA - the amount of ERC20 transferred or minted to the RollupProcessor.sol
+     */
     function convert(
         Types.AztecAsset calldata inputAssetA,
         Types.AztecAsset calldata,
-        Types.AztecAsset calldata,
+        Types.AztecAsset calldata outputAssetA,
         Types.AztecAsset calldata,
         uint256 inputValue,
         uint256,
@@ -71,12 +105,13 @@ contract StakingBridge is IDefiBridge, ERC20("StakingBridge", "SB") {
     {
         require(msg.sender == rollupProcessor, "StakingBridge: INVALID_CALLER");
         require(
-            inputAssetA.erc20Address == LQTY || inputAssetA.erc20Address == address(this),
+            (inputAssetA.erc20Address == LQTY && outputAssetA.erc20Address == address(this)) ||
+                (inputAssetA.erc20Address == address(this) && outputAssetA.erc20Address == LQTY),
             "StakingBridge: INCORRECT_INPUT"
         );
 
         if (inputAssetA.erc20Address == LQTY) {
-            // Deposit and claim rewards
+            // Stake and claim rewards
             STAKING_CONTRACT.stake(inputValue);
             _swapRewardsToLQTYAndStake();
             // outputValueA = how much SB should be minted
@@ -108,12 +143,13 @@ contract StakingBridge is IDefiBridge, ERC20("StakingBridge", "SB") {
     }
 
     /*
-     * Swaps any ETH and LUSD currently held by the contract to LQTY and stakes them to STAKING_CONTRACT.
+     * @notice Swaps any ETH and LUSD currently held by the contract to LQTY and stakes LQTY in LQTYStaking.sol.
+     *
+     * @dev Note: The best route for LUSD -> LQTY is consistently LUSD -> USDC -> WETH -> LQTY. Since I want to swap
+     * liquidation rewards (ETH) to LQTY as well, I will first swap LUSD to WETH through USDC and then swap it all
+     * to LQTY
      */
     function _swapRewardsToLQTYAndStake() internal {
-        // Note: The best route for LUSD -> LQTY is consistently LUSD -> USDC -> WETH -> LQTY. Since I want to swap
-        // liquidation rewards (ETH) to LQTY as well, I will first swap LUSD to WETH through USDC and then swap it all
-        // to LQTY
         uint256 lusdBalance = IERC20(LUSD).balanceOf(address(this));
         if (lusdBalance != 0) {
             uint256 usdcBalance = UNI_ROUTER.exactInputSingle(
@@ -141,12 +177,14 @@ contract StakingBridge is IDefiBridge, ERC20("StakingBridge", "SB") {
         }
     }
 
+    // @return Always false because this contract does not implement async flow.
     function canFinalise(
         uint256 /*interactionNonce*/
     ) external view override returns (bool) {
         return false;
     }
 
+    // @notice This function always reverts because this contract does not implement async flow.
     function finalise(
         Types.AztecAsset calldata,
         Types.AztecAsset calldata,

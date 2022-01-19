@@ -13,14 +13,14 @@ import "./Types.sol";
 import "./interfaces/ISwapRouter.sol";
 
 /**
- * @title Aztec Connect Bridge for Liquity's Stability Pool
- * @author Jan Benes
- * @notice You can use this contract to deposit and withdraw LUSD to and from Liquity's Stability Pool contract.
- * @dev Implementation of the IDefiBridge interface for StabilityPool from Liquity protocol.
+ * @title Aztec Connect Bridge for Liquity's StabilityPool.sol
+ * @author Jan Benes (@benesjan on Github and Telegram)
+ * @notice You can use this contract to deposit and withdraw LUSD to and from Liquity's StabilityPool.sol.
+ * @dev Implementation of the IDefiBridge interface for StabilityPool.sol.
  *
  * The contract inherits from OpenZeppelin's implementation of ERC20 token because token balances are used to track
  * the depositor's ownership of the assets controlled by the bridge contract. The token is called StabilityPoolBridge
- * and the token symbol is SPB. During first deposits an equal amount of SPB tokens is minted as the amount of LUSD
+ * and the token symbol is SPB. During the first deposits an equal amount of SPB tokens is minted as the amount of LUSD
  * deposited - 1 SPB is worth 1 LUSD.  1 SPB token stops being worth 1 LUSD once rewards are claimed. There are 2 types
  * of rewards in the StabilityPool: 1) ETH from liquidations, 2) LQTY from early adopter rewards.
  *
@@ -82,8 +82,8 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
      * @notice Function which deposits or withdraws LUSD to/from StabilityBridge.sol.
      * @dev This method can only be called from the RollupProcessor.sol. If the input asset is LUSD, deposit flow is
      * executed. If SPB, withdrawal. RollupProcessor.sol has to transfer the tokens to the bridge before calling
-     * the method. If this is not the case, the function will revert (either in STABILITY_POOL.provideToSP or during
-     * SPB burn).
+     * the method. If this is not the case, the function will revert (either in STABILITY_POOL.provideToSP(...) or
+     * during SPB burn).
      *
      * Note: The function will revert during withdrawal in case there are troves to be liquidated. I am not handling
      * this scenario because I expect the liquidation bots to be so fast that the scenario will never occur. Checking
@@ -91,8 +91,8 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
      *
      * @param inputAssetA - LUSD (Deposit) or SPB (Withdrawal)
      * @param outputAssetA - SPB (Deposit) or LUSD (Withdrawal)
-     * @param inputValue - the amount of LUSD to deposit or the amount of SPB to withdraw
-     * @return outputValueA - the amount of ERC20 transferred or minted to RollupProcessor.sol
+     * @param inputValue - the amount of LUSD to deposit or the amount of SPB to burn and exchange for LUSD
+     * @return outputValueA - the amount of ERC20 transferred or minted to the RollupProcessor.sol
      */
     function convert(
         Types.AztecAsset calldata inputAssetA,
