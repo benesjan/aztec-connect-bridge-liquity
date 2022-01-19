@@ -19,17 +19,18 @@ import "./interfaces/ISwapRouter.sol";
  * @dev Implementation of the IDefiBridge interface for StabilityPool from Liquity protocol.
  *
  * The contract inherits from OpenZeppelin's implementation of ERC20 token because token balances are used to track
- * the depositor's ownership of the assets controlled by the bridge contract. During first deposits equal amount of
- * bridge tokens (In this case - SPB tokens) is minted as the amount of LUSD deposited - 1 SPB is worth 1 LUSD.  1 SPB
- * token stops being worth 1 LUSD once rewards are claimed. There are 2 types of rewards in the StabilityPool: 1) ETH
- * from liquidations, 2) LQTY from early adopter rewards.
+ * the depositor's ownership of the assets controlled by the bridge contract. The token is called StabilityPoolBridge
+ * and the token symbol is SPB. During first deposits an equal amount of SPB tokens is minted as the amount of LUSD
+ * deposited - 1 SPB is worth 1 LUSD.  1 SPB token stops being worth 1 LUSD once rewards are claimed. There are 2 types
+ * of rewards in the StabilityPool: 1) ETH from liquidations, 2) LQTY from early adopter rewards.
  *
  * See https://docs.liquity.org/faq/stability-pool-and-liquidations#how-do-i-benefit-as-a-stability-provider-from-liquidations[Liquity docs]
  * for more details.
  *
  * Rewards are automatically claimed and swapped to LUSD before each deposit and withdrawal. This allows for precise
- * computation of how much each SPB is worth.
+ * computation of how much each SPB is worth in terms of LUSD.
  *
+ * Note: StabilityPoolBridge.sol is very similar to StakingBridge.sol.
  */
 contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB") {
     using SafeMath for uint256;
@@ -45,12 +46,15 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
     address public immutable rollupProcessor;
     address public immutable frontEndTag; // see StabilityPool.sol for details
 
-    /// @notice Set addresses and token approvals.
-    /// @param _rollupProcessor Address of the RollupProcessor.sol
-    /// @param _frontEndTag See https://docs.liquity.org/faq/frontend-operators#how-do-frontend-tags-work[Liquity docs]
+    /**
+     * @notice Set addresses and token approvals.
+     * @param _rollupProcessor Address of the RollupProcessor.sol
+     * @param _frontEndTag An address/tag identifying to which frontend LQTY frontend rewards should go. Can be zero.
+     * @dev Frontend tag is set here because there can be only 1 frontend tag per msg.sender in the StabilityPool.sol.
+     * See https://docs.liquity.org/faq/frontend-operators#how-do-frontend-tags-work[Liquity docs] for more details.
+     */
     constructor(address _rollupProcessor, address _frontEndTag) public {
         rollupProcessor = _rollupProcessor;
-        // Note: frontEndTag is set only once for msg.sender in StabilityPool.sol. Can be zero address.
         frontEndTag = _frontEndTag;
 
         // Note: StabilityPoolBridge never holds LUSD, LQTY, USDC or WETH after or before an invocation of any of its
@@ -74,25 +78,26 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
         );
     }
 
-    /*
-    * Deposit:
-    * @param inputAssetA - LUSD
-    * @param outputAssetA - StabilityPoolBridge ERC20
-    * @param inputValue - the amount of LUSD to deposit
-
-    * Withdrawal:
-    * inputAssetA - StabilityPoolBridge ERC20
-    * outputAssetA - LUSD
-    * inputValue - the amount of StabilityPoolBridge ERC20
-    *
-    * Note: The function will revert during withdrawal in case there are troves to be liquidated. I am not handling
-    * this scenario because I expect the liquidation bots to be so fast that the scenario will never occur. Checking
-    * for it would only waste gas.
-    */
+    /**
+     * @notice Function which deposits or withdraws LUSD to/from StabilityBridge.sol.
+     * @dev This method can only be called from the RollupProcessor.sol. If the input asset is LUSD, deposit flow is
+     * executed. If SPB, withdrawal. RollupProcessor.sol has to transfer the tokens to the bridge before calling
+     * the method. If this is not the case, the function will revert (either in STABILITY_POOL.provideToSP or during
+     * SPB burn).
+     *
+     * Note: The function will revert during withdrawal in case there are troves to be liquidated. I am not handling
+     * this scenario because I expect the liquidation bots to be so fast that the scenario will never occur. Checking
+     * for it would only waste gas.
+     *
+     * @param inputAssetA - LUSD (Deposit) or SPB (Withdrawal)
+     * @param outputAssetA - SPB (Deposit) or LUSD (Withdrawal)
+     * @param inputValue - the amount of LUSD to deposit or the amount of SPB to withdraw
+     * @return outputValueA - the amount of ERC20 transferred or minted to RollupProcessor.sol
+     */
     function convert(
         Types.AztecAsset calldata inputAssetA,
         Types.AztecAsset calldata,
-        Types.AztecAsset calldata,
+        Types.AztecAsset calldata outputAssetA,
         Types.AztecAsset calldata,
         uint256 inputValue,
         uint256,
@@ -109,14 +114,17 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
     {
         require(msg.sender == rollupProcessor, "StabilityPoolBridge: INVALID_CALLER");
         require(
-            inputAssetA.erc20Address == LUSD || inputAssetA.erc20Address == address(this),
-            "StabilityPoolBridge: INCORRECT_INPUT"
+            (inputAssetA.erc20Address == LUSD && outputAssetA.erc20Address == address(this)) ||
+                (inputAssetA.erc20Address == address(this) && outputAssetA.erc20Address == LUSD),
+            "StabilityPoolBridge: INCORRECT_INPUT_OUTPUT"
         );
+
+        isAsync = false;
 
         if (inputAssetA.erc20Address == LUSD) {
             // Deposit LUSD and claim rewards.
             STABILITY_POOL.provideToSP(inputValue, frontEndTag);
-            _swapRewardsOnUniAndDeposit();
+            _swapRewardsToLUSDAndDeposit();
             uint256 totalLUSDOwnedBeforeDeposit = STABILITY_POOL.getCompoundedLUSDDeposit(address(this)).sub(
                 inputValue
             );
@@ -134,10 +142,10 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
             // Withdrawal
             // Claim rewards and swap them to LUSD.
             STABILITY_POOL.withdrawFromSP(0);
-            _swapRewardsOnUniAndDeposit();
+            _swapRewardsToLUSDAndDeposit();
 
             // stabilityPool.getCompoundedLUSDDeposit(address(this)).div(this.totalSupply()) = how much LUSD is one SPB
-            // outputValueA = amount of LUSD to be withdrawn and sent to rollupProcessor
+            // outputValueA = amount of LUSD to be withdrawn and sent to RollupProcessor.sol
             outputValueA = STABILITY_POOL.getCompoundedLUSDDeposit(address(this)).mul(inputValue).div(
                 this.totalSupply()
             );
@@ -148,18 +156,16 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
                 "StabilityPoolBridge: WITHDRAWAL_TRANSFER_FAILED"
             );
         }
-
-        return (outputValueA, 0, false);
     }
 
     /*
-     * Swaps any ETH and LQTY currently held by the contract to LUSD and deposits LUSD to StabilityPool.sol.
+     * @notice Swaps any ETH and LQTY currently held by the contract to LUSD and deposits LUSD to the StabilityPool.sol.
+     *
+     * @dev Note: The best route for LQTY -> LUSD is consistently LQTY -> WETH -> USDC -> LUSD. Since I want to swap
+     * liquidations rewards (ETH) to LUSD as well, I will first swap LQTY to WETH and then swap it all through USDC to
+     * LUSD.
      */
-    function _swapRewardsOnUniAndDeposit() internal {
-        // Note: The best route for LQTY -> LUSD is consistently LQTY -> WETH -> USDC -> LUSD. Since I want to swap
-        // liquidations rewards (ETH) to LUSD as well, I will first swap LQTY to WETH and then swap it all through
-        // USDC to LUSD
-
+    function _swapRewardsToLUSDAndDeposit() internal {
         uint256 lqtyBalance = IERC20(LQTY).balanceOf(address(this));
         if (lqtyBalance != 0) {
             UNI_ROUTER.exactInputSingle(
@@ -187,12 +193,14 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
         }
     }
 
+    // @return Always false because this contract does not implement async flow.
     function canFinalise(
         uint256 /*interactionNonce*/
     ) external view override returns (bool) {
         return false;
     }
 
+    // @notice This function always reverts because this contract does not implement async flow.
     function finalise(
         Types.AztecAsset calldata,
         Types.AztecAsset calldata,
