@@ -92,7 +92,8 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
      * @param inputAssetA - LUSD (Deposit) or SPB (Withdrawal)
      * @param outputAssetA - SPB (Deposit) or LUSD (Withdrawal)
      * @param inputValue - the amount of LUSD to deposit or the amount of SPB to burn and exchange for LUSD
-     * @return outputValueA - the amount of ERC20 transferred or minted to the RollupProcessor.sol
+     * @return outputValueA - the amount of SPB (Deposit) or LUSD (Withdrawal) minted/transferred to
+     * the RollupProcessor.sol
      */
     function convert(
         Types.AztecAsset calldata inputAssetA,

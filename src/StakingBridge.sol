@@ -72,7 +72,8 @@ contract StakingBridge is IDefiBridge, ERC20("StakingBridge", "SB") {
      * @param inputAssetA - LQTY (Staking) or SB (Unstaking)
      * @param outputAssetA - SB (Staking) or LQTY (Unstaking)
      * @param inputValue - the amount of LQTY to stake or the amount of SB to burn and exchange for LQTY
-     * @return outputValueA - the amount of ERC20 transferred or minted to the RollupProcessor.sol
+     * @return outputValueA - the amount of SB (Staking) or LQTY (Unstaking) minted/transferred to
+     * the RollupProcessor.sol
      */
     function convert(
         Types.AztecAsset calldata inputAssetA,
