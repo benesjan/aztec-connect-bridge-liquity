@@ -99,6 +99,8 @@ contract StakingBridge is IDefiBridge, ERC20("StakingBridge", "SB") {
             "StakingBridge: INCORRECT_INPUT"
         );
 
+        isAsync = false;
+
         if (inputAssetA.erc20Address == LQTY) {
             // Stake and claim rewards
             STAKING_CONTRACT.stake(inputValue);
@@ -127,8 +129,6 @@ contract StakingBridge is IDefiBridge, ERC20("StakingBridge", "SB") {
             _burn(address(this), inputValue);
             require(IERC20(LQTY).transfer(rollupProcessor, outputValueA), "StakingBridge: WITHDRAWAL_TRANSFER_FAILED");
         }
-
-        return (outputValueA, 0, false);
     }
 
     /*
