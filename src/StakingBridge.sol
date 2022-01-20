@@ -62,17 +62,6 @@ contract StakingBridge is IDefiBridge, ERC20("StakingBridge", "SB") {
         require(IERC20(USDC).approve(address(UNI_ROUTER), type(uint256).max), "StakingBridge: USDC_APPROVE_FAILED");
     }
 
-    /*
-    * Deposit:
-    * inputAssetA - LQTY
-    * outputAssetA - StakingBridge ERC20
-    * inputValue - the amount of LQTY to deposit
-
-    * Withdrawal:
-    * inputAssetA - StakingBridge ERC20
-    * outputAssetA - LQTY
-    * inputValue - the amount of StakingBridge ERC20
-    */
     /**
      * @notice Function which stakes or unstakes LQTY to/from LQTYStaking.sol.
      * @dev This method can only be called from the RollupProcessor.sol. If the input asset is LQTY, staking flow is
