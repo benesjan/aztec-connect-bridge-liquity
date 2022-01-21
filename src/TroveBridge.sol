@@ -1,0 +1,112 @@
+// SPDX-License-Identifier: GPL-2.0-only
+pragma solidity 0.6.11;
+pragma experimental ABIEncoderV2;
+
+import "../lib/openzeppelin-contracts/contracts/math/SafeMath.sol";
+import "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import "../lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
+import "../lib/openzeppelin-contracts/contracts/access/Ownable.sol";
+
+import "./Types.sol";
+import "./interfaces/IDefiBridge.sol";
+import "./interfaces/IBorrowerOperations.sol";
+
+contract TroveBridge is IDefiBridge, ERC20("TroveBridge", "TB"), Ownable {
+    using SafeMath for uint256;
+
+    address public constant LUSD = 0x5f98805A4E8be255a32880FDeC7F6728C6568bA0;
+
+    IBorrowerOperations public constant operations = IBorrowerOperations(0x24179CD81c9e782A4096035f7eC97fB8B783e007);
+
+    address public immutable rollupProcessor;
+
+    /**
+     * @notice Set the addresses of RollupProcessor.sol and token approvals.
+     * @param _rollupProcessor Address of the RollupProcessor.sol
+     */
+    constructor(address _rollupProcessor) public {
+        rollupProcessor = _rollupProcessor;
+    }
+
+    function openTrove(
+        uint256 _maxFee,
+        uint256 _LUSDAmount,
+        address _upperHint,
+        address _lowerHint
+    ) external payable onlyOwner {
+        // Note: I am not checking if the trove is already open because IBorrowerOperations.openTrove(...) checks it
+        operations.openTrove{value: msg.value}(_maxFee, _LUSDAmount, _upperHint, _lowerHint);
+    }
+
+    /**
+     * @notice Function which stakes or unstakes LQTY to/from LQTYStaking.sol.
+     * @dev This method can only be called from the RollupProcessor.sol. If the input asset is ETH, borrowing flow is
+     * executed. If TB, repaying. RollupProcessor.sol has to transfer the tokens to the bridge before calling
+     * the method. If this is not the case, the function will revert.
+     *
+     * @param inputAssetA - ETH (Borrowing) or TB (Repaying)
+     * @param inputAssetB - None (Borrowing) or LUSD (Repaying)
+     * @param outputAssetA - TB (Borrowing) or ETH (Repaying)
+     * @param outputAssetB - LUSD (Borrowing) or None (Repaying)
+     * @param inputValue - the amount of ETH to borrow against (Borrowing) or the amount of TB to burn and LUSD debt to
+     * repay (Repaying)
+     * @return outputValueA - the amount of TB (Borrowing) or ETH (Repaying) minted/transferred to
+     * the RollupProcessor.sol
+     * @return outputValueB - the amount of LUSD (Borrowing) transferred to the the RollupProcessor.sol (0 when
+     * repaying)
+     */
+    function convert(
+        Types.AztecAsset calldata inputAssetA,
+        Types.AztecAsset calldata inputAssetB,
+        Types.AztecAsset calldata outputAssetA,
+        Types.AztecAsset calldata outputAssetB,
+        uint256 inputValue,
+        uint256,
+        uint64
+    )
+        external
+        payable
+        override
+        returns (
+            uint256 outputValueA,
+            uint256 outputValueB,
+            bool isAsync
+        )
+    {
+        require(msg.sender == rollupProcessor, "TroveBridge: INVALID_CALLER");
+        require(
+            (inputAssetA.assetType == Types.AztecAssetType.ETH &&
+                outputAssetA.erc20Address == address(this) &&
+                outputAssetB.erc20Address == LUSD) ||
+                (inputAssetA.erc20Address == address(this) &&
+                    inputAssetB.erc20Address == LUSD &&
+                    outputAssetA.assetType == Types.AztecAssetType.ETH),
+            "TroveBridge: INCORRECT_INPUT"
+        );
+    }
+
+    function closeTrove() public onlyOwner {}
+
+    // @return Always false because this contract does not implement async flow.
+    function canFinalise(
+        uint256 /*interactionNonce*/
+    ) external view override returns (bool) {
+        return false;
+    }
+
+    // @notice This function always reverts because this contract does not implement async flow.
+    function finalise(
+        Types.AztecAsset calldata,
+        Types.AztecAsset calldata,
+        Types.AztecAsset calldata,
+        Types.AztecAsset calldata,
+        uint256,
+        uint64
+    ) external payable override returns (uint256, uint256) {
+        require(false, "TroveBridge: ASYNC_MODE_DISABLED");
+    }
+
+    receive() external payable {}
+
+    fallback() external payable {}
+}
