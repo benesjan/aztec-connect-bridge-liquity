@@ -81,9 +81,8 @@ contract StabilityPoolBridgeTest is TestUtil {
 
     function test10DepositsWithdrawals() public {
         uint256 i = 0;
-        uint256 depositAmount = 203;
-
         uint256 numIters = 10;
+        uint256 depositAmount = 203;
         uint256[] memory spbBalances = new uint256[](numIters);
 
         while (i < numIters) {

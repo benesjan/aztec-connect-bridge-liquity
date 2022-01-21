@@ -6,9 +6,9 @@ import "../lib/openzeppelin-contracts/contracts/math/SafeMath.sol";
 import "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import "../lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 
-import "./interfaces/IDefiBridge.sol";
-import "./interfaces/IWETH.sol";
 import "./Types.sol";
+import "./interfaces/IWETH.sol";
+import "./interfaces/IDefiBridge.sol";
 import "./interfaces/ISwapRouter.sol";
 import "./interfaces/ILQTYStaking.sol";
 
