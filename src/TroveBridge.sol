@@ -10,6 +10,7 @@ import "../lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import "./Types.sol";
 import "./interfaces/IDefiBridge.sol";
 import "./interfaces/IBorrowerOperations.sol";
+import "./interfaces/ITroveManager.sol";
 import "../lib/openzeppelin-contracts/contracts/utils/Strings.sol";
 
 contract TroveBridge is IDefiBridge, ERC20, Ownable {
@@ -19,31 +20,34 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
     address public constant LUSD = 0x5f98805A4E8be255a32880FDeC7F6728C6568bA0;
 
     IBorrowerOperations public constant operations = IBorrowerOperations(0x24179CD81c9e782A4096035f7eC97fB8B783e007);
+    ITroveManager public constant troveManager = ITroveManager(0xA39739EF8b0231DbFA0DcdA07d7e29faAbCf4bb2);
 
     address public immutable rollupProcessor;
-    uint256 public immutable initialCollateralRatio;
+    uint256 public immutable initialICR; // ICR is an acronym for individual collateral ratio
 
     /**
-     * @notice Set the addresses of RollupProcessor.sol and token approvals.
+     * @notice Set the address of RollupProcessor.sol and initial ICR
      * @param _rollupProcessor Address of the RollupProcessor.sol
-     * @param _initialCollateralRatio Collateral ratio (denominated in percents) used when opening the Trove
+     * @param _initialICRPerc Collateral ratio denominated in percents to be used when opening the Trove
      */
-    constructor(address _rollupProcessor, uint256 _initialCollateralRatio)
+    constructor(address _rollupProcessor, uint256 _initialICRPerc)
         public
-        ERC20("TroveBridge", string(abi.encodePacked("TB-", _initialCollateralRatio.toString())))
+        ERC20("TroveBridge", string(abi.encodePacked("TB-", _initialICRPerc.toString())))
     {
         rollupProcessor = _rollupProcessor;
-        initialCollateralRatio = _initialCollateralRatio;
+        initialICR = _initialICRPerc * 10**16;
     }
 
     function openTrove(
         uint256 _maxFee,
-        uint256 _LUSDAmount,
         address _upperHint,
         address _lowerHint
     ) external payable onlyOwner {
         // Note: I am not checking if the trove is already open because IBorrowerOperations.openTrove(...) checks it
+        // I will compute LUSD amount borrowed based on initialICR (has to stay constant) and msg.value
+        uint256 _LUSDAmount = computeDebt(msg.value);
         operations.openTrove{value: msg.value}(_maxFee, _LUSDAmount, _upperHint, _lowerHint);
+        IERC20(LUSD).transfer(msg.sender, IERC20(LUSD).balanceOf(address(this)));
     }
 
     /**
@@ -82,6 +86,7 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
         )
     {
         require(msg.sender == rollupProcessor, "TroveBridge: INVALID_CALLER");
+        require(troveManager.getTroveStatus(address(this)) == 1, "TroveBridge: INACTIVE_TROVE");
         require(
             (inputAssetA.assetType == Types.AztecAssetType.ETH &&
                 outputAssetA.erc20Address == address(this) &&
@@ -94,6 +99,24 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
     }
 
     function closeTrove() public onlyOwner {}
+
+    /**
+     * @notice Compute how much LUSD to borrow against collateral in order to keep ICR constant.
+     * @param _coll Amount of ETH denominated in Wei
+     * @dev I don't use view modifier here because the function updates PriceFeed state.
+     */
+    function computeDebt(uint256 _coll) public returns (uint256 debt) {
+        uint256 price = troveManager.priceFeed().fetchPrice();
+        uint256 ICR;
+        if (troveManager.getTroveStatus(address(this)) == 1) {
+            // Trove is active - use current ICR and not the initial one
+            ICR = troveManager.getCurrentICR(address(this), price);
+        } else {
+            // Trove is inactive - use initial ICR as ICR
+            ICR = initialICR;
+        }
+        debt = _coll.mul(price).div(ICR);
+    }
 
     // @return Always false because this contract does not implement async flow.
     function canFinalise(
