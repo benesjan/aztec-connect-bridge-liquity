@@ -10,22 +10,29 @@ import "../lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import "./Types.sol";
 import "./interfaces/IDefiBridge.sol";
 import "./interfaces/IBorrowerOperations.sol";
+import "../lib/openzeppelin-contracts/contracts/utils/Strings.sol";
 
-contract TroveBridge is IDefiBridge, ERC20("TroveBridge", "TB"), Ownable {
+contract TroveBridge is IDefiBridge, ERC20, Ownable {
     using SafeMath for uint256;
+    using Strings for uint256;
 
     address public constant LUSD = 0x5f98805A4E8be255a32880FDeC7F6728C6568bA0;
 
     IBorrowerOperations public constant operations = IBorrowerOperations(0x24179CD81c9e782A4096035f7eC97fB8B783e007);
 
     address public immutable rollupProcessor;
+    uint256 public immutable targetCollateralRatio;
 
     /**
      * @notice Set the addresses of RollupProcessor.sol and token approvals.
      * @param _rollupProcessor Address of the RollupProcessor.sol
      */
-    constructor(address _rollupProcessor) public {
+    constructor(address _rollupProcessor, uint256 _targetCollateralRatio)
+        public
+        ERC20("TroveBridge", string(abi.encodePacked("TB-", _targetCollateralRatio.toString())))
+    {
         rollupProcessor = _rollupProcessor;
+        targetCollateralRatio = _targetCollateralRatio;
     }
 
     function openTrove(

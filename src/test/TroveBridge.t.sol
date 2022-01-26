@@ -12,12 +12,12 @@ contract TroveBridgeTest is TestUtil {
     function setUp() public {
         setUpTokens();
         address rollupProcessor = address(this);
-        bridge = new TroveBridge(rollupProcessor);
+        bridge = new TroveBridge(rollupProcessor, 250);
     }
 
     function testInitialERC20Params() public {
         assertEq(bridge.name(), "TroveBridge");
-        assertEq(bridge.symbol(), "TB");
+        assertEq(bridge.symbol(), "TB-250");
         assertEq(uint256(bridge.decimals()), 18);
     }
 
