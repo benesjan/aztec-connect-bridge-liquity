@@ -12,7 +12,8 @@ contract TroveBridgeTest is TestUtil {
     function setUp() public {
         setUpTokens();
         address rollupProcessor = address(this);
-        bridge = new TroveBridge(rollupProcessor, 250);
+        uint256 initialCollateralRatio = 250;
+        bridge = new TroveBridge(rollupProcessor, initialCollateralRatio);
     }
 
     function testInitialERC20Params() public {

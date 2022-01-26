@@ -21,18 +21,19 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
     IBorrowerOperations public constant operations = IBorrowerOperations(0x24179CD81c9e782A4096035f7eC97fB8B783e007);
 
     address public immutable rollupProcessor;
-    uint256 public immutable targetCollateralRatio;
+    uint256 public immutable initialCollateralRatio;
 
     /**
      * @notice Set the addresses of RollupProcessor.sol and token approvals.
      * @param _rollupProcessor Address of the RollupProcessor.sol
+     * @param _initialCollateralRatio Collateral ratio (denominated in percents) used when opening the Trove
      */
-    constructor(address _rollupProcessor, uint256 _targetCollateralRatio)
+    constructor(address _rollupProcessor, uint256 _initialCollateralRatio)
         public
-        ERC20("TroveBridge", string(abi.encodePacked("TB-", _targetCollateralRatio.toString())))
+        ERC20("TroveBridge", string(abi.encodePacked("TB-", _initialCollateralRatio.toString())))
     {
         rollupProcessor = _rollupProcessor;
-        targetCollateralRatio = _targetCollateralRatio;
+        initialCollateralRatio = _initialCollateralRatio;
     }
 
     function openTrove(
