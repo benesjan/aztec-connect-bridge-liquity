@@ -126,7 +126,7 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
             LUSDToBorrow = _coll.mul(price).div(ICR);
             if (!isRecoveryMode) {
                 // Liquity is not in recovery mode so borrowing fee applies
-                uint256 borrowingRate = troveManager.getBorrowingRate();
+                uint256 borrowingRate = troveManager.getBorrowingRateWithDecay();
                 LUSDToBorrow = LUSDToBorrow.mul(1e18).div(borrowingRate.add(1e18));
             }
         } else {
@@ -135,7 +135,7 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
             LUSDToBorrow = _coll.mul(price).div(initialICR) - 200e18;
             if (!isRecoveryMode) {
                 // Liquity is not in recovery mode so borrowing fee applies
-                uint256 borrowingRate = troveManager.getBorrowingRate();
+                uint256 borrowingRate = troveManager.getBorrowingRateWithDecay();
                 LUSDToBorrow = LUSDToBorrow.mul(1e18).div(borrowingRate.add(1e18));
             }
         }
