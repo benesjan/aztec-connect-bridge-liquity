@@ -94,15 +94,11 @@ contract StakingBridge is IDefiBridge, ERC20("StakingBridge", "SB") {
         )
     {
         require(msg.sender == rollupProcessor, "StakingBridge: INVALID_CALLER");
-        require(
-            (inputAssetA.erc20Address == LQTY && outputAssetA.erc20Address == address(this)) ||
-                (inputAssetA.erc20Address == address(this) && outputAssetA.erc20Address == LQTY),
-            "StakingBridge: INCORRECT_INPUT"
-        );
-
         isAsync = false;
 
         if (inputAssetA.erc20Address == LQTY) {
+            // Deposit
+            require(outputAssetA.erc20Address == address(this), "StakingBridge: INCORRECT_DEPOSIT_INPUT");
             // Stake and claim rewards
             STAKING_CONTRACT.stake(inputValue);
             _swapRewardsToLQTYAndStake();
@@ -119,6 +115,10 @@ contract StakingBridge is IDefiBridge, ERC20("StakingBridge", "SB") {
             _mint(rollupProcessor, outputValueA);
         } else {
             // Withdrawal
+            require(
+                inputAssetA.erc20Address == address(this) && outputAssetA.erc20Address == LQTY,
+                "StakingBridge: INCORRECT_WITHDRAWAL_INPUT"
+            );
             // Claim rewards
             STAKING_CONTRACT.unstake(0);
             _swapRewardsToLQTYAndStake();

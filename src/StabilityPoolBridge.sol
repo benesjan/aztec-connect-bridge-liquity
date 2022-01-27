@@ -114,15 +114,11 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
         )
     {
         require(msg.sender == rollupProcessor, "StabilityPoolBridge: INVALID_CALLER");
-        require(
-            (inputAssetA.erc20Address == LUSD && outputAssetA.erc20Address == address(this)) ||
-                (inputAssetA.erc20Address == address(this) && outputAssetA.erc20Address == LUSD),
-            "StabilityPoolBridge: INCORRECT_INPUT_OUTPUT"
-        );
-
         isAsync = false;
 
         if (inputAssetA.erc20Address == LUSD) {
+            // Deposit
+            require(outputAssetA.erc20Address == address(this), "StabilityPoolBridge: INCORRECT_DEPOSIT_INPUT");
             // Deposit LUSD and claim rewards.
             STABILITY_POOL.provideToSP(inputValue, frontEndTag);
             _swapRewardsToLUSDAndDeposit();
@@ -141,6 +137,10 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
             _mint(rollupProcessor, outputValueA);
         } else {
             // Withdrawal
+            require(
+                inputAssetA.erc20Address == address(this) && outputAssetA.erc20Address == LUSD,
+                "StabilityPoolBridge: INCORRECT_WITHDRAWAL_INPUT"
+            );
             // Claim rewards and swap them to LUSD.
             STABILITY_POOL.withdrawFromSP(0);
             _swapRewardsToLUSDAndDeposit();
