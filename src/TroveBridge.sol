@@ -103,27 +103,40 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
     /**
      * @notice Compute how much LUSD to borrow against collateral in order to keep ICR constant.
      * @param _coll Amount of ETH denominated in Wei
+     * @return LUSDToBorrow Amount of LUSD to borrow to keep ICR constant.
      * @dev I don't use view modifier here because the function updates PriceFeed state.
+     *
+     * Since the Trove opening and adjustment processes have desired amount of LUSD to borrow on the input and not
+     * the desired ICR I have to do the computation of borrowing fee "backwards". Here are the operations I did in order
+     * to get the final formula:
+     *      1) totalDebt = LUSDToBorrow + LUSDToBorrow * BORROWING_RATE / DECIMAL_PRECISION + 200LUSD
+     *      2) totalDebt - 200LUSD = LUSDToBorrow * (1 + BORROWING_RATE / DECIMAL_PRECISION)
+     *      3) LUSDToBorrow = (totalDebt - 200LUSD) / (1 + BORROWING_RATE / DECIMAL_PRECISION)
+     *      4) LUSDToBorrow = (totalDebt - 200LUSD) * DECIMAL_PRECISION / (DECIMAL_PRECISION + BORROWING_RATE)
+     * Note1: For trove adjustments (not opening) remove the 200 LUSD fee compensation from the formulas above.
+     * Note2: Step 4 is necessary to avoid loss of precision. BORROWING_RATE / DECIMAL_PRECISION was rounded to 0.
+     * Note3: The borrowing fee computation is on this line in Liquity code: https://github.com/liquity/dev/blob/cb583ddf5e7de6010e196cfe706bd0ca816ea40e/packages/contracts/contracts/TroveManager.sol#L1433
      */
-    function computeLUSDToBorrow(uint256 _coll) public returns (uint256 debt) {
+    function computeLUSDToBorrow(uint256 _coll) public returns (uint256 LUSDToBorrow) {
         uint256 price = troveManager.priceFeed().fetchPrice();
         bool isRecoveryMode = troveManager.checkRecoveryMode(price);
         if (troveManager.getTroveStatus(address(this)) == 1) {
             // Trove is active - use current ICR and not the initial one
             uint256 ICR = troveManager.getCurrentICR(address(this), price);
-            debt = _coll.mul(price).div(ICR);
+            LUSDToBorrow = _coll.mul(price).div(ICR);
             if (!isRecoveryMode) {
-                // borrowing fee
-                // TODO
+                // Liquity is not in recovery mode so borrowing fee applies
+                uint256 borrowingRate = troveManager.getBorrowingRate();
+                LUSDToBorrow = LUSDToBorrow.mul(1e18).div(borrowingRate.add(1e18));
             }
         } else {
             // Trove is inactive - I will use initial ICR to compute debt
             // 200e18 - 200 LUSD gas compensation (compensation to liquidators)
-            debt = _coll.mul(price).div(initialICR) - 200e18;
+            LUSDToBorrow = _coll.mul(price).div(initialICR) - 200e18;
             if (!isRecoveryMode) {
-                // borrowing fee
+                // Liquity is not in recovery mode so borrowing fee applies
                 uint256 borrowingRate = troveManager.getBorrowingRate();
-                debt = debt.div(1 + borrowingRate.div(1e18));
+                LUSDToBorrow = LUSDToBorrow.mul(1e18).div(borrowingRate.add(1e18));
             }
         }
     }
