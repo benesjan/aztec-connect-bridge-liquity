@@ -45,7 +45,7 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
     ) external payable onlyOwner {
         // Note: I am not checking if the trove is already open because IBorrowerOperations.openTrove(...) checks it
         // I will compute LUSD amount borrowed based on initialICR (has to stay constant) and msg.value
-        uint256 _LUSDAmount = computeDebt(msg.value);
+        uint256 _LUSDAmount = computeLUSDToBorrow(msg.value);
         operations.openTrove{value: msg.value}(_maxFee, _LUSDAmount, _upperHint, _lowerHint);
         IERC20(LUSD).transfer(msg.sender, IERC20(LUSD).balanceOf(address(this)));
     }
@@ -105,17 +105,27 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
      * @param _coll Amount of ETH denominated in Wei
      * @dev I don't use view modifier here because the function updates PriceFeed state.
      */
-    function computeDebt(uint256 _coll) public returns (uint256 debt) {
+    function computeLUSDToBorrow(uint256 _coll) public returns (uint256 debt) {
         uint256 price = troveManager.priceFeed().fetchPrice();
-        uint256 ICR;
+        bool isRecoveryMode = troveManager.checkRecoveryMode(price);
         if (troveManager.getTroveStatus(address(this)) == 1) {
             // Trove is active - use current ICR and not the initial one
-            ICR = troveManager.getCurrentICR(address(this), price);
+            uint256 ICR = troveManager.getCurrentICR(address(this), price);
+            debt = _coll.mul(price).div(ICR);
+            if (!isRecoveryMode) {
+                // borrowing fee
+                // TODO
+            }
         } else {
-            // Trove is inactive - use initial ICR as ICR
-            ICR = initialICR;
+            // Trove is inactive - I will use initial ICR to compute debt
+            // 200e18 - 200 LUSD gas compensation (compensation to liquidators)
+            debt = _coll.mul(price).div(initialICR) - 200e18;
+            if (!isRecoveryMode) {
+                // borrowing fee
+                uint256 borrowingRate = troveManager.getBorrowingRate();
+                debt = debt.div(1 + borrowingRate.div(1e18));
+            }
         }
-        debt = _coll.mul(price).div(ICR);
     }
 
     // @return Always false because this contract does not implement async flow.

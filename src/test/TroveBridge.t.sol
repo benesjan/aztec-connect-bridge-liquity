@@ -28,7 +28,7 @@ contract TroveBridgeTest is TestUtil {
 
     function testOpenTrove() public {
         uint256 ETHColl = 5 * WAD;
-        uint256 LUSDAmount = bridge.computeDebt(ETHColl);
+        uint256 LUSDAmount = bridge.computeLUSDToBorrow(ETHColl);
         uint256 NICR_PRECISION = 1e20;
         uint256 NICR = ETHColl.mul(NICR_PRECISION).div(LUSDAmount);
 
@@ -42,7 +42,7 @@ contract TroveBridgeTest is TestUtil {
         bridge.openTrove{value: ETHColl}(maxFee, upperHint, lowerHint);
 
         uint256 price = bridge.troveManager().priceFeed().fetchPrice();
-        uint ICR = bridge.troveManager().getCurrentICR(address(bridge), price);
+        uint256 ICR = bridge.troveManager().getCurrentICR(address(bridge), price);
 
         assertEq(ICR, 250 * 1e16);
         assertGt(IERC20(tokens["LUSD"].addr).balanceOf(address(this)), 1900 * WAD);
