@@ -17,7 +17,8 @@ contract TroveBridgeTest is TestUtil {
         setUpTokens();
         address rollupProcessor = address(this);
         uint256 initialCollateralRatio = 250;
-        bridge = new TroveBridge(rollupProcessor, initialCollateralRatio);
+        uint256 maxFee = 5e16; // Slippage protection: 5%
+        bridge = new TroveBridge(rollupProcessor, initialCollateralRatio, maxFee);
     }
 
     function testInitialERC20Params() public {
@@ -38,13 +39,16 @@ contract TroveBridgeTest is TestUtil {
         (address approxHint, , ) = hintHelpers.getApproxHint(NICR, numTrials, randomSeed);
         (address upperHint, address lowerHint) = sortedTroves.findInsertPosition(NICR, approxHint, approxHint);
 
-        uint256 maxFee = 5 * 10**16; // Slippage protection: 5%
-        bridge.openTrove{value: ETHColl}(maxFee, upperHint, lowerHint);
+        bridge.openTrove{value: ETHColl}(upperHint, lowerHint);
 
         uint256 price = bridge.troveManager().priceFeed().fetchPrice();
         uint256 ICR = bridge.troveManager().getCurrentICR(address(bridge), price);
 
-        assertEq(ICR, 250 * 1e16);
-        assertGt(IERC20(tokens["LUSD"].addr).balanceOf(address(this)), 1900 * WAD);
+        assertEq(ICR, 250e16);
+
+        uint256 TBBalance = IERC20(address(bridge)).balanceOf(address(this));
+        uint256 LUSDBalance = IERC20(tokens["LUSD"].addr).balanceOf(address(this));
+
+        assertEq(TBBalance, LUSDBalance.add(200e18));
     }
 }

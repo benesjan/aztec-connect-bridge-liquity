@@ -24,30 +24,32 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
 
     address public immutable rollupProcessor;
     uint256 public immutable initialICR; // ICR is an acronym for individual collateral ratio
+    uint256 public immutable maxFee;
 
     /**
      * @notice Set the address of RollupProcessor.sol and initial ICR
      * @param _rollupProcessor Address of the RollupProcessor.sol
      * @param _initialICRPerc Collateral ratio denominated in percents to be used when opening the Trove
      */
-    constructor(address _rollupProcessor, uint256 _initialICRPerc)
-        public
-        ERC20("TroveBridge", string(abi.encodePacked("TB-", _initialICRPerc.toString())))
-    {
+    constructor(
+        address _rollupProcessor,
+        uint256 _initialICRPerc,
+        uint256 _maxFee
+    ) public ERC20("TroveBridge", string(abi.encodePacked("TB-", _initialICRPerc.toString()))) {
         rollupProcessor = _rollupProcessor;
-        initialICR = _initialICRPerc * 10**16;
+        initialICR = _initialICRPerc * 1e16;
+        maxFee = _maxFee;
     }
 
-    function openTrove(
-        uint256 _maxFee,
-        address _upperHint,
-        address _lowerHint
-    ) external payable onlyOwner {
+    function openTrove(address _upperHint, address _lowerHint) external payable onlyOwner {
         // Note: I am not checking if the trove is already open because IBorrowerOperations.openTrove(...) checks it
         // I will compute LUSD amount borrowed based on initialICR (has to stay constant) and msg.value
-        uint256 _LUSDAmount = computeLUSDToBorrow(msg.value);
-        operations.openTrove{value: msg.value}(_maxFee, _LUSDAmount, _upperHint, _lowerHint);
+        uint256 LUSDAmount = computeLUSDToBorrow(msg.value);
+        operations.openTrove{value: msg.value}(maxFee, LUSDAmount, _upperHint, _lowerHint);
         IERC20(LUSD).transfer(msg.sender, IERC20(LUSD).balanceOf(address(this)));
+        // I mint TB token to msg.sender to be able to track collateral ownership. I add 200 LUSD to to LUSDAmount
+        // because gas compensation will be returned if the trove is not to be liquidated.
+        _mint(msg.sender, LUSDAmount.add(200e18));
     }
 
     /**
@@ -96,6 +98,13 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
                 outputAssetA.erc20Address == address(this) && outputAssetB.erc20Address == LUSD,
                 "TroveBridge: INCORRECT_BORROWING_INPUT"
             );
+            uint256 LUSDAmount = computeLUSDToBorrow(msg.value);
+            // Todo: pass non-zero hints
+            operations.adjustTrove(maxFee, 0, LUSDAmount, true, address(0), address(0));
+            outputValueA = LUSDAmount;
+            outputValueB = LUSDAmount;
+            _mint(rollupProcessor, outputValueA);
+            require(IERC20(LUSD).transfer(rollupProcessor, outputValueB), "TroveBridge: LUSD_TRANSFER_FAILED");
         } else {
             // Withdrawing
             require(
@@ -104,6 +113,12 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
                     outputAssetA.assetType == Types.AztecAssetType.ETH,
                 "TroveBridge: INCORRECT_WITHDRAWING_INPUT"
             );
+            (, uint256 coll, , ) = troveManager.getEntireDebtAndColl(address(this));
+            uint256 collToWithdraw = coll.mul(inputValue).div(this.totalSupply());
+            // Todo: pass non-zero hints
+            operations.adjustTrove(maxFee, collToWithdraw, inputValue, false, address(0), address(0));
+            _burn(address(this), inputValue);
+            require(rollupProcessor.send(address(this).balance), "TroveBridge: ETH_WITHDRAWAL_FAILED");
         }
     }
 
