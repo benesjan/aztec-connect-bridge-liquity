@@ -85,17 +85,26 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
             bool isAsync
         )
     {
+        // TODO: handle liquidations
         require(msg.sender == rollupProcessor, "TroveBridge: INVALID_CALLER");
         require(troveManager.getTroveStatus(address(this)) == 1, "TroveBridge: INACTIVE_TROVE");
-        require(
-            (inputAssetA.assetType == Types.AztecAssetType.ETH &&
-                outputAssetA.erc20Address == address(this) &&
-                outputAssetB.erc20Address == LUSD) ||
-                (inputAssetA.erc20Address == address(this) &&
+        isAsync = false;
+
+        if (inputAssetA.assetType == Types.AztecAssetType.ETH) {
+            // Borrowing
+            require(
+                outputAssetA.erc20Address == address(this) && outputAssetB.erc20Address == LUSD,
+                "TroveBridge: INCORRECT_BORROWING_INPUT"
+            );
+        } else {
+            // Withdrawing
+            require(
+                inputAssetA.erc20Address == address(this) &&
                     inputAssetB.erc20Address == LUSD &&
-                    outputAssetA.assetType == Types.AztecAssetType.ETH),
-            "TroveBridge: INCORRECT_INPUT"
-        );
+                    outputAssetA.assetType == Types.AztecAssetType.ETH,
+                "TroveBridge: INCORRECT_WITHDRAWING_INPUT"
+            );
+        }
     }
 
     function closeTrove() public onlyOwner {}
