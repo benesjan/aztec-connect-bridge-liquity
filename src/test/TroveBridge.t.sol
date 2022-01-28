@@ -28,10 +28,10 @@ contract TroveBridgeTest is TestUtil {
     }
 
     function testOpenTrove() public {
-        uint256 ETHColl = 5 * WAD;
-        uint256 LUSDAmount = bridge.computeLUSDToBorrow(ETHColl);
+        uint256 ethColl = 5 * WAD;
+        (uint256 debtIncr, uint256 amtToBorrow) = bridge.computeDebitIncrAndAmtToBorrow(ethColl);
         uint256 NICR_PRECISION = 1e20;
-        uint256 NICR = ETHColl.mul(NICR_PRECISION).div(LUSDAmount);
+        uint256 NICR = ethColl.mul(NICR_PRECISION).div(amtToBorrow);
 
         // The following is Solidity implementation of https://github.com/liquity/dev#opening-a-trove
         uint256 numTrials = 15;
@@ -39,7 +39,7 @@ contract TroveBridgeTest is TestUtil {
         (address approxHint, , ) = hintHelpers.getApproxHint(NICR, numTrials, randomSeed);
         (address upperHint, address lowerHint) = sortedTroves.findInsertPosition(NICR, approxHint, approxHint);
 
-        bridge.openTrove{value: ETHColl}(upperHint, lowerHint);
+        bridge.openTrove{value: ethColl}(upperHint, lowerHint);
 
         uint256 price = bridge.troveManager().priceFeed().fetchPrice();
         uint256 ICR = bridge.troveManager().getCurrentICR(address(bridge), price);
@@ -49,6 +49,7 @@ contract TroveBridgeTest is TestUtil {
         uint256 TBBalance = IERC20(address(bridge)).balanceOf(address(this));
         uint256 LUSDBalance = IERC20(tokens["LUSD"].addr).balanceOf(address(this));
 
-        assertEq(TBBalance, LUSDBalance.add(200e18));
+        assertEq(TBBalance, debtIncr);
+        assertEq(LUSDBalance, amtToBorrow);
     }
 }
