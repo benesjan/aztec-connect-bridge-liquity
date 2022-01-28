@@ -52,4 +52,31 @@ contract TroveBridgeTest is TestUtil {
         assertEq(TBBalance, debtIncr);
         assertEq(LUSDBalance, amtToBorrow);
     }
+
+    function testBorrowRepaymentFlow() public {
+        testOpenTrove();
+
+        // I will deposit and withdraw 1 ETH
+        uint256 depositAmount = WAD;
+
+        uint256 TBBalanceBefore = IERC20(address(bridge)).balanceOf(address(this));
+        uint256 LUSDBalanceBefore = IERC20(tokens["LUSD"].addr).balanceOf(address(this));
+
+        // 2. Deposit LQTY to the staking contract through the bridge
+        bridge.convert(
+            Types.AztecAsset(3, address(0), Types.AztecAssetType.ETH),
+            Types.AztecAsset(0, address(0), Types.AztecAssetType.NOT_USED),
+            Types.AztecAsset(2, address(bridge), Types.AztecAssetType.ERC20),
+            Types.AztecAsset(1, tokens["LUSD"].addr, Types.AztecAssetType.ERC20),
+            depositAmount,
+            0,
+            0
+        );
+
+        uint256 TBBalanceAfter = IERC20(address(bridge)).balanceOf(address(this));
+        uint256 LUSDBalanceAfter = IERC20(tokens["LUSD"].addr).balanceOf(address(this));
+
+        assertGt(TBBalanceAfter, TBBalanceBefore);
+        assertGt(LUSDBalanceAfter, LUSDBalanceBefore);
+    }
 }

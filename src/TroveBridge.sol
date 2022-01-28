@@ -101,10 +101,10 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
                 outputAssetA.erc20Address == address(this) && outputAssetB.erc20Address == LUSD,
                 "TroveBridge: INCORRECT_BORROWING_INPUT"
             );
-            // outputValueA = by how much debt will increase/how much TB to mint
+            // outputValueA = by how much debt will increase and how much TB to mint
             // outputValueB = LUSD amount to borrow
             (outputValueA, outputValueB) = computeDebitIncrAndAmtToBorrow(msg.value);
-            operations.adjustTrove(maxFee, 0, outputValueA, true, upperHint, lowerHint);
+            operations.adjustTrove{value: inputValue}(maxFee, 0, outputValueA, true, upperHint, lowerHint);
             _mint(rollupProcessor, outputValueA);
             require(IERC20(LUSD).transfer(rollupProcessor, outputValueB), "TroveBridge: LUSD_TRANSFER_FAILED");
         } else {
