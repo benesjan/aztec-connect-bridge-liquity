@@ -12,6 +12,7 @@ import "./interfaces/IDefiBridge.sol";
 import "./interfaces/IBorrowerOperations.sol";
 import "./interfaces/ITroveManager.sol";
 import "../lib/openzeppelin-contracts/contracts/utils/Strings.sol";
+import "./interfaces/ISortedTroves.sol";
 
 contract TroveBridge is IDefiBridge, ERC20, Ownable {
     using SafeMath for uint256;
@@ -21,8 +22,9 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
 
     IBorrowerOperations public constant operations = IBorrowerOperations(0x24179CD81c9e782A4096035f7eC97fB8B783e007);
     ITroveManager public constant troveManager = ITroveManager(0xA39739EF8b0231DbFA0DcdA07d7e29faAbCf4bb2);
+    ISortedTroves public constant sortedTroves = ISortedTroves(0x8FdD3fbFEb32b28fb73555518f8b361bCeA741A6);
 
-    address public immutable rollupProcessor;
+    address payable public immutable rollupProcessor;
     uint256 public immutable initialICR; // ICR is an acronym for individual collateral ratio
     uint256 public immutable maxFee;
 
@@ -32,7 +34,7 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
      * @param _initialICRPerc Collateral ratio denominated in percents to be used when opening the Trove
      */
     constructor(
-        address _rollupProcessor,
+        address payable _rollupProcessor,
         uint256 _initialICRPerc,
         uint256 _maxFee
     ) public ERC20("TroveBridge", string(abi.encodePacked("TB-", _initialICRPerc.toString()))) {
@@ -92,18 +94,19 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
         require(troveManager.getTroveStatus(address(this)) == 1, "TroveBridge: INACTIVE_TROVE");
         isAsync = false;
 
+        address upperHint = sortedTroves.getPrev(address(this));
+        address lowerHint = sortedTroves.getNext(address(this));
+
         if (inputAssetA.assetType == Types.AztecAssetType.ETH) {
             // Borrowing
             require(
                 outputAssetA.erc20Address == address(this) && outputAssetB.erc20Address == LUSD,
                 "TroveBridge: INCORRECT_BORROWING_INPUT"
             );
-            uint256 LUSDAmount = computeLUSDToBorrow(msg.value);
-            // Todo: pass non-zero hints
-            operations.adjustTrove(maxFee, 0, LUSDAmount, true, address(0), address(0));
-            outputValueA = LUSDAmount;
-            outputValueB = LUSDAmount;
+             outputValueA = computeLUSDToBorrow(msg.value); // Amount of TB to mint and LUSD to borrow
+            operations.adjustTrove(maxFee, 0, outputValueA, true, upperHint, lowerHint);
             _mint(rollupProcessor, outputValueA);
+            outputValueB = outputValueA;
             require(IERC20(LUSD).transfer(rollupProcessor, outputValueB), "TroveBridge: LUSD_TRANSFER_FAILED");
         } else {
             // Withdrawing
@@ -114,11 +117,10 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
                 "TroveBridge: INCORRECT_WITHDRAWING_INPUT"
             );
             (, uint256 coll, , ) = troveManager.getEntireDebtAndColl(address(this));
-            uint256 collToWithdraw = coll.mul(inputValue).div(this.totalSupply());
-            // Todo: pass non-zero hints
-            operations.adjustTrove(maxFee, collToWithdraw, inputValue, false, address(0), address(0));
+             outputValueA = coll.mul(inputValue).div(this.totalSupply()); // Amount of collateral to withdraw
+            operations.adjustTrove(maxFee, outputValueA, inputValue, false, upperHint, lowerHint);
             _burn(address(this), inputValue);
-            require(rollupProcessor.send(address(this).balance), "TroveBridge: ETH_WITHDRAWAL_FAILED");
+            require(rollupProcessor.send(outputValueA), "TroveBridge: ETH_WITHDRAWAL_FAILED");
         }
     }
 

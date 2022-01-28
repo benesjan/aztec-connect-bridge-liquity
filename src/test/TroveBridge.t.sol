@@ -4,9 +4,9 @@ pragma experimental ABIEncoderV2;
 
 import "../TroveBridge.sol";
 import "../Types.sol";
+import "../interfaces/ISortedTroves.sol";
 import "./TestUtil.sol";
 import "./interfaces/IHintHelpers.sol";
-import "./interfaces/ISortedTroves.sol";
 
 contract TroveBridgeTest is TestUtil {
     TroveBridge private bridge;
@@ -15,7 +15,7 @@ contract TroveBridgeTest is TestUtil {
 
     function setUp() public {
         setUpTokens();
-        address rollupProcessor = address(this);
+        address payable rollupProcessor = payable(address(this));
         uint256 initialCollateralRatio = 250;
         uint256 maxFee = 5e16; // Slippage protection: 5%
         bridge = new TroveBridge(rollupProcessor, initialCollateralRatio, maxFee);
