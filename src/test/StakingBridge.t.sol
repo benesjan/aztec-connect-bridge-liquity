@@ -75,7 +75,7 @@ contract StakingBridgeTest is TestUtil {
         assertEq(IERC20(tokens["LQTY"].addr).balanceOf(address(this)), depositAmount);
     }
 
-    function test102DepositsWithdrawals() public {
+    function test10DepositsWithdrawals() public {
         uint256 i = 0;
         uint256 numIters = 10;
         uint256 depositAmount = 203;
