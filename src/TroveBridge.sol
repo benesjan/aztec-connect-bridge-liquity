@@ -45,7 +45,7 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
 
     function openTrove(address _upperHint, address _lowerHint) external payable onlyOwner {
         // Note: I am not checking if the trove is already open because IBorrowerOperations.openTrove(...) checks it.
-        (uint256 debtIncr, uint256 amtToBorrow) = computeDebitIncrAndAmtToBorrow(msg.value);
+        (uint256 debtIncr, uint256 amtToBorrow) = computeDebtIncrAndAmtToBorrow(msg.value);
         operations.openTrove{value: msg.value}(maxFee, amtToBorrow, _upperHint, _lowerHint);
         IERC20(LUSD).transfer(msg.sender, IERC20(LUSD).balanceOf(address(this)));
         // I mint TB token to msg.sender to be able to track collateral ownership.
@@ -103,12 +103,12 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
             );
             // outputValueA = by how much debt will increase and how much TB to mint
             // outputValueB = LUSD amount to borrow
-            (outputValueA, outputValueB) = computeDebitIncrAndAmtToBorrow(msg.value);
-            operations.adjustTrove{value: inputValue}(maxFee, 0, outputValueA, true, upperHint, lowerHint);
+            (outputValueA, outputValueB) = computeDebtIncrAndAmtToBorrow(inputValue);
+            operations.adjustTrove{value: inputValue}(maxFee, 0, outputValueB, true, upperHint, lowerHint);
             _mint(rollupProcessor, outputValueA);
             require(IERC20(LUSD).transfer(rollupProcessor, outputValueB), "TroveBridge: LUSD_TRANSFER_FAILED");
         } else {
-            // Withdrawing
+            // Repaying
             require(
                 inputAssetA.erc20Address == address(this) &&
                     inputAssetB.erc20Address == LUSD &&
@@ -145,7 +145,7 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
      * Note2: Step 4 is necessary to avoid loss of precision. BORROWING_RATE / DECIMAL_PRECISION was rounded to 0.
      * Note3: The borrowing fee computation is on this line in Liquity code: https://github.com/liquity/dev/blob/cb583ddf5e7de6010e196cfe706bd0ca816ea40e/packages/contracts/contracts/TroveManager.sol#L1433
      */
-    function computeDebitIncrAndAmtToBorrow(uint256 _coll) public returns (uint256 debtIncr, uint256 amtToBorrow) {
+    function computeDebtIncrAndAmtToBorrow(uint256 _coll) public returns (uint256 debtIncr, uint256 amtToBorrow) {
         uint256 price = troveManager.priceFeed().fetchPrice();
         bool isRecoveryMode = troveManager.checkRecoveryMode(price);
         if (troveManager.getTroveStatus(address(this)) == 1) {
