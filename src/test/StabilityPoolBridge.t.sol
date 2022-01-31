@@ -56,10 +56,7 @@ contract StabilityPoolBridgeTest is TestUtil {
         uint256 withdrawAmount = depositAmount;
 
         // 7. Transfer the withdraw amount of SPB to the bridge
-        require(
-            IERC20(address(bridge)).transfer(address(bridge), withdrawAmount),
-            "StabilityPoolBridgeTest: WITHDRAW_TRANSFER_FAILED"
-        );
+        require(bridge.transfer(address(bridge), withdrawAmount), "StabilityPoolBridgeTest: WITHDRAW_TRANSFER_FAILED");
 
         // 8. Withdraw LUSD from StabilityPool through the bridge
         bridge.convert(
@@ -113,7 +110,7 @@ contract StabilityPoolBridgeTest is TestUtil {
             uint256 withdrawAmount = spbBalances[i];
             // 4. Transfer the withdraw amount of SPB to the bridge
             require(
-                IERC20(address(bridge)).transfer(address(bridge), withdrawAmount),
+                bridge.transfer(address(bridge), withdrawAmount),
                 "StabilityPoolBridgeTest: WITHDRAW_TRANSFER_FAILED"
             );
 

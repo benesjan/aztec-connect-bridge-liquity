@@ -52,10 +52,7 @@ contract StakingBridgeTest is TestUtil {
         uint256 withdrawAmount = depositAmount;
 
         // 7. Transfer the withdraw amount of SB to the bridge
-        require(
-            IERC20(address(bridge)).transfer(address(bridge), withdrawAmount),
-            "StakingBridgeTest: WITHDRAW_TRANSFER_FAILED"
-        );
+        require(bridge.transfer(address(bridge), withdrawAmount), "StakingBridgeTest: WITHDRAW_TRANSFER_FAILED");
 
         // 8. Withdraw LQTY from the staking contract through the bridge
         bridge.convert(
@@ -108,10 +105,7 @@ contract StakingBridgeTest is TestUtil {
         while (i < numIters) {
             uint256 withdrawAmount = sbBalances[i];
             // 4. Transfer the withdraw amount of SB to the bridge
-            require(
-                IERC20(address(bridge)).transfer(address(bridge), withdrawAmount),
-                "StakingBridgeTest: WITHDRAW_TRANSFER_FAILED"
-            );
+            require(bridge.transfer(address(bridge), withdrawAmount), "StakingBridgeTest: WITHDRAW_TRANSFER_FAILED");
 
             // 5. Withdraw LQTY from Staking through the bridge
             bridge.convert(
