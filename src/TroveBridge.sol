@@ -45,11 +45,15 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
 
     function openTrove(address _upperHint, address _lowerHint) external payable onlyOwner {
         // Note: I am not checking if the trove is already open because IBorrowerOperations.openTrove(...) checks it.
-        (uint256 debtIncr, uint256 amtToBorrow) = computeDebtIncrAndAmtToBorrow(msg.value);
+        uint256 amtToBorrow = computeAmtToBorrow(msg.value);
+
+        (uint256 debtBefore, , , ) = troveManager.getEntireDebtAndColl(address(this));
         operations.openTrove{value: msg.value}(maxFee, amtToBorrow, _upperHint, _lowerHint);
+        (uint256 debtAfter, , , ) = troveManager.getEntireDebtAndColl(address(this));
+
         IERC20(LUSD).transfer(msg.sender, IERC20(LUSD).balanceOf(address(this)));
-        // I mint TB token to msg.sender to be able to track collateral ownership.
-        _mint(msg.sender, debtIncr);
+        // I mint TB token to msg.sender to be able to track collateral ownership. Minted amount equals debt increase.
+        _mint(msg.sender, debtAfter.sub(debtBefore));
     }
 
     /**
@@ -102,10 +106,16 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
                 "TroveBridge: INCORRECT_BORROWING_INPUT"
             );
             // outputValueA = by how much debt will increase and how much TB to mint
-            // outputValueB = LUSD amount to borrow
-            (outputValueA, outputValueB) = computeDebtIncrAndAmtToBorrow(inputValue);
+            uint256 outputValueB = computeAmtToBorrow(inputValue); // LUSD amount to borrow
+
+            (uint256 debtBefore, , , ) = troveManager.getEntireDebtAndColl(address(this));
             operations.adjustTrove{value: inputValue}(maxFee, 0, outputValueB, true, upperHint, lowerHint);
+            (uint256 debtAfter, , , ) = troveManager.getEntireDebtAndColl(address(this));
+
+            // outputValueA = debt increase = amount of TB to mint
+            outputValueA = debtAfter.sub(debtBefore);
             _mint(rollupProcessor, outputValueA);
+
             require(IERC20(LUSD).transfer(rollupProcessor, outputValueB), "TroveBridge: LUSD_TRANSFER_FAILED");
         } else {
             // Repaying
@@ -129,7 +139,6 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
      * @notice Compute how much LUSD to borrow against collateral in order to keep ICR constant and by how much total
      * trove debt will increase.
      * @param _coll Amount of ETH denominated in Wei
-     * @return debtIncr Amount of LUSD by which total trove debt will increase (amtToBorrow + gas compensation
      * @return amtToBorrow Amount of LUSD to borrow to keep ICR constant.
      * + borrowing fee)
      * @dev I don't use view modifier here because the function updates PriceFeed state.
@@ -137,33 +146,30 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
      * Since the Trove opening and adjustment processes have desired amount of LUSD to borrow on the input and not
      * the desired ICR I have to do the computation of borrowing fee "backwards". Here are the operations I did in order
      * to get the final formula:
-     *      1) debtIncr = amtToBorrow + amtToBorrow * BORROWING_RATE / DECIMAL_PRECISION + 200LUSD
-     *      2) debtIncr - 200LUSD = amtToBorrow * (1 + BORROWING_RATE / DECIMAL_PRECISION)
-     *      3) amtToBorrow = (debtIncr - 200LUSD) / (1 + BORROWING_RATE / DECIMAL_PRECISION)
-     *      4) amtToBorrow = (debtIncr - 200LUSD) * DECIMAL_PRECISION / (DECIMAL_PRECISION + BORROWING_RATE)
+     *      1) debtIncrease = amtToBorrow + amtToBorrow * BORROWING_RATE / DECIMAL_PRECISION + 200LUSD
+     *      2) debtIncrease - 200LUSD = amtToBorrow * (1 + BORROWING_RATE / DECIMAL_PRECISION)
+     *      3) amtToBorrow = (debtIncrease - 200LUSD) / (1 + BORROWING_RATE / DECIMAL_PRECISION)
+     *      4) amtToBorrow = (debtIncrease - 200LUSD) * DECIMAL_PRECISION / (DECIMAL_PRECISION + BORROWING_RATE)
      * Note1: For trove adjustments (not opening) remove the 200 LUSD fee compensation from the formulas above.
      * Note2: Step 4 is necessary to avoid loss of precision. BORROWING_RATE / DECIMAL_PRECISION was rounded to 0.
      * Note3: The borrowing fee computation is on this line in Liquity code: https://github.com/liquity/dev/blob/cb583ddf5e7de6010e196cfe706bd0ca816ea40e/packages/contracts/contracts/TroveManager.sol#L1433
      */
-    function computeDebtIncrAndAmtToBorrow(uint256 _coll) public returns (uint256 debtIncr, uint256 amtToBorrow) {
+    function computeAmtToBorrow(uint256 _coll) public returns (uint256 amtToBorrow) {
         uint256 price = troveManager.priceFeed().fetchPrice();
         bool isRecoveryMode = troveManager.checkRecoveryMode(price);
         if (troveManager.getTroveStatus(address(this)) == 1) {
             // Trove is active - use current ICR and not the initial one
             uint256 ICR = troveManager.getCurrentICR(address(this), price);
-            debtIncr = _coll.mul(price).div(ICR);
-            if (isRecoveryMode) {
-                amtToBorrow = debtIncr;
-            } else {
+            amtToBorrow = _coll.mul(price).div(ICR);
+            if (!isRecoveryMode) {
                 // Liquity is not in recovery mode so borrowing fee applies
                 uint256 borrowingRate = troveManager.getBorrowingRateWithDecay();
-                amtToBorrow = debtIncr.mul(1e18).div(borrowingRate.add(1e18));
+                amtToBorrow = amtToBorrow.mul(1e18).div(borrowingRate.add(1e18));
             }
         } else {
             // Trove is inactive - I will use initial ICR to compute debt
-            debtIncr = _coll.mul(price).div(initialICR);
             // 200e18 - 200 LUSD gas compensation to liquidators
-            amtToBorrow = debtIncr.sub(200e18);
+            amtToBorrow = _coll.mul(price).div(initialICR).sub(200e18);
             if (!isRecoveryMode) {
                 // Liquity is not in recovery mode so borrowing fee applies
                 uint256 borrowingRate = troveManager.getBorrowingRateWithDecay();
