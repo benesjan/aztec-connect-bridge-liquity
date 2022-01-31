@@ -13,6 +13,7 @@ import "./interfaces/IBorrowerOperations.sol";
 import "./interfaces/ITroveManager.sol";
 import "../lib/openzeppelin-contracts/contracts/utils/Strings.sol";
 import "./interfaces/ISortedTroves.sol";
+import "./interfaces/IRollupProcessor.sol";
 
 contract TroveBridge is IDefiBridge, ERC20, Ownable {
     using SafeMath for uint256;
@@ -79,7 +80,7 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
         Types.AztecAsset calldata outputAssetA,
         Types.AztecAsset calldata outputAssetB,
         uint256 inputValue,
-        uint256,
+        uint256 interactionNonce,
         uint64
     )
         external
@@ -129,7 +130,7 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
             outputValueA = coll.mul(inputValue).div(this.totalSupply()); // Amount of collateral to withdraw
             operations.adjustTrove(maxFee, outputValueA, inputValue, false, upperHint, lowerHint);
             _burn(address(this), inputValue);
-            require(rollupProcessor.send(outputValueA), "TroveBridge: ETH_WITHDRAWAL_FAILED");
+            IRollupProcessor(rollupProcessor).receiveEthFromBridge{value: outputValueA}(interactionNonce);
         }
     }
 

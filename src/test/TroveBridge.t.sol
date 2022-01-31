@@ -5,13 +5,16 @@ pragma experimental ABIEncoderV2;
 import "../TroveBridge.sol";
 import "../Types.sol";
 import "../interfaces/ISortedTroves.sol";
+import "../interfaces/IRollupProcessor.sol";
 import "./TestUtil.sol";
 import "./interfaces/IHintHelpers.sol";
 
-contract TroveBridgeTest is TestUtil {
+contract TroveBridgeTest is TestUtil, IRollupProcessor {
     TroveBridge private bridge;
     IHintHelpers private constant hintHelpers = IHintHelpers(0xE84251b93D9524E0d2e621Ba7dc7cb3579F997C0);
     ISortedTroves private constant sortedTroves = ISortedTroves(0x8FdD3fbFEb32b28fb73555518f8b361bCeA741A6);
+
+    function receiveEthFromBridge(uint256 interactionNonce) external override payable {}
 
     function setUp() public {
         setUpTokens();
@@ -71,6 +74,8 @@ contract TroveBridgeTest is TestUtil {
         // Send depositAmount to the bridge contract
         require(address(bridge).send(depositAmount), "TroveBridgeTest: ETH_TRANSFER_FAILED");
 
+        uint256 balanceTBBeforeBorrowing = bridge.balanceOf(address(this));
+
         uint256 price = bridge.troveManager().priceFeed().fetchPrice();
         uint256 ICRBeforeBorrowing = bridge.troveManager().getCurrentICR(address(bridge), price);
 
@@ -103,5 +108,30 @@ contract TroveBridgeTest is TestUtil {
         // Check the bridge doesn't hold any ETH or LUSD
         assertEq(address(bridge).balance, 0);
         assertEq(IERC20(tokens["LUSD"].addr).balanceOf(address(bridge)), 0);
+
+        uint256 changeInTB = bridge.balanceOf(address(this)).sub(balanceTBBeforeBorrowing);
+
+        // Transfer TB and LUSD to the bridge before repaying
+        require(bridge.transfer(address(bridge), changeInTB), "TroveBridgeTest: TB_TRANSFER_FAILED");
+        require(
+            IERC20(tokens["LUSD"].addr).transfer(address(bridge), changeInTB),
+            "TroveBridgeTest: LUSD_TRANSFER_FAILED"
+        );
+
+        uint256 balanceETHBeforeRepaying = address(this).balance;
+
+        bridge.convert(
+            Types.AztecAsset(2, address(bridge), Types.AztecAssetType.ERC20),
+            Types.AztecAsset(1, tokens["LUSD"].addr, Types.AztecAssetType.ERC20),
+            Types.AztecAsset(3, address(0), Types.AztecAssetType.ETH),
+            Types.AztecAsset(0, address(0), Types.AztecAssetType.NOT_USED),
+            changeInTB,
+            0,
+            0
+        );
+
+        uint256 changeInETH = address(this).balance.sub(balanceETHBeforeRepaying);
+
+        assertEq(changeInETH, depositAmount);
     }
 }
