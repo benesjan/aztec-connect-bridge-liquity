@@ -28,10 +28,10 @@ contract TroveBridgeTest is TestUtil {
     }
 
     function testOpenTrove() public {
-        uint256 ethColl = 5 * WAD;
-        (uint256 debtIncr, uint256 amtToBorrow) = bridge.computeDebtIncrAndAmtToBorrow(ethColl);
+        uint256 depositAmount = 5 * WAD;
+        uint256 amtToBorrow = bridge.computeAmtToBorrow(depositAmount);
         uint256 NICR_PRECISION = 1e20;
-        uint256 NICR = ethColl.mul(NICR_PRECISION).div(amtToBorrow);
+        uint256 NICR = depositAmount.mul(NICR_PRECISION).div(amtToBorrow);
 
         // The following is Solidity implementation of https://github.com/liquity/dev#opening-a-trove
         uint256 numTrials = 15;
@@ -39,18 +39,28 @@ contract TroveBridgeTest is TestUtil {
         (address approxHint, , ) = hintHelpers.getApproxHint(NICR, numTrials, randomSeed);
         (address upperHint, address lowerHint) = sortedTroves.findInsertPosition(NICR, approxHint, approxHint);
 
-        bridge.openTrove{value: ethColl}(upperHint, lowerHint);
+        // Open the trove
+        bridge.openTrove{value: depositAmount}(upperHint, lowerHint);
 
         uint256 price = bridge.troveManager().priceFeed().fetchPrice();
         uint256 ICR = bridge.troveManager().getCurrentICR(address(bridge), price);
-
+        // Verify the ICR equals the one specified in the bridge constructor
         assertEq(ICR, 250e16);
 
-        uint256 TBBalance = IERC20(address(bridge)).balanceOf(address(this));
-        uint256 LUSDBalance = IERC20(tokens["LUSD"].addr).balanceOf(address(this));
+        (uint256 debtAfterBorrowing, uint256 collAfterBorrowing, , ) = bridge.troveManager().getEntireDebtAndColl(
+            address(bridge)
+        );
+        // Check the TB total supply equals totalDebt
+        assertEq(IERC20(address(bridge)).totalSupply(), debtAfterBorrowing);
+        // Check the trove's collateral equals deposit amount
+        assertEq(collAfterBorrowing, depositAmount);
 
-        assertEq(TBBalance, debtIncr);
+        uint256 LUSDBalance = IERC20(tokens["LUSD"].addr).balanceOf(address(this));
         assertEq(LUSDBalance, amtToBorrow);
+
+        // Check the bridge doesn't hold any ETH or LUSD
+        assertEq(address(bridge).balance, 0);
+        assertEq(IERC20(tokens["LUSD"].addr).balanceOf(address(bridge)), 0);
     }
 
     function testBorrowRepaymentFlow() public {
@@ -58,20 +68,15 @@ contract TroveBridgeTest is TestUtil {
 
         // I will deposit and withdraw 1 ETH
         uint256 depositAmount = WAD;
-
-        uint256 LUSDBalanceBefore = IERC20(tokens["LUSD"].addr).balanceOf(address(this));
-
         // Send depositAmount to the bridge contract
         require(address(bridge).send(depositAmount), "TroveBridgeTest: ETH_TRANSFER_FAILED");
 
         uint256 price = bridge.troveManager().priceFeed().fetchPrice();
         uint256 ICRBeforeBorrowing = bridge.troveManager().getCurrentICR(address(bridge), price);
 
-        (uint256 debtBeforeBorrowing, uint256 collBeforeBorrowing, , ) = bridge.troveManager().getEntireDebtAndColl(
-            address(bridge)
-        );
+        (, uint256 collBeforeBorrowing, , ) = bridge.troveManager().getEntireDebtAndColl(address(bridge));
 
-        // 2. Borrow against depositAmount
+        // Borrow against depositAmount
         bridge.convert(
             Types.AztecAsset(3, address(0), Types.AztecAssetType.ETH),
             Types.AztecAsset(0, address(0), Types.AztecAssetType.NOT_USED),
@@ -85,19 +90,18 @@ contract TroveBridgeTest is TestUtil {
         (uint256 debtAfterBorrowing, uint256 collAfterBorrowing, , ) = bridge.troveManager().getEntireDebtAndColl(
             address(bridge)
         );
+        // Check the collateral increase equals depositAmount
         assertEq(collAfterBorrowing.sub(collBeforeBorrowing), depositAmount);
 
         uint256 ICRAfterBorrowing = bridge.troveManager().getCurrentICR(address(bridge), price);
+        // Check the the ICR didn't change
         assertEq(ICRBeforeBorrowing, ICRAfterBorrowing);
 
-        uint256 TBBalanceAfter = IERC20(address(bridge)).balanceOf(address(this));
-        uint256 LUSDBalanceAfter = IERC20(tokens["LUSD"].addr).balanceOf(address(this));
-
-        uint debtChange = debtAfterBorrowing.sub(debtBeforeBorrowing);
-        uint TBChange = TBBalanceAfter.sub(TBBalanceBefore);
-
+        // Check the TB total supply equals totalDebt
         assertEq(IERC20(address(bridge)).totalSupply(), debtAfterBorrowing);
 
-        assertGt(LUSDBalanceAfter, LUSDBalanceBefore);
+        // Check the bridge doesn't hold any ETH or LUSD
+        assertEq(address(bridge).balance, 0);
+        assertEq(IERC20(tokens["LUSD"].addr).balanceOf(address(bridge)), 0);
     }
 }
