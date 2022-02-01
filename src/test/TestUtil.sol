@@ -13,6 +13,14 @@ interface Hevm {
         bytes32,
         bytes32
     ) external;
+
+    function prank(address) external;
+
+    function startPrank(address) external;
+
+    function stopPrank() external;
+
+    function deal(address, uint256) external;
 }
 
 contract TestUtil is DSTest {
@@ -20,7 +28,12 @@ contract TestUtil is DSTest {
 
     Hevm internal hevm;
 
+    // TODO: remove the following and simply use 1e18
     uint256 internal constant WAD = 10**18;
+
+    // TODO: refactor setUpTokens and use the following constants in all the tests
+    address internal constant LUSD_ADDR = 0x5f98805A4E8be255a32880FDeC7F6728C6568bA0;
+    IERC20 internal constant LUSD_TOKEN = IERC20(0x5f98805A4E8be255a32880FDeC7F6728C6568bA0);
 
     struct Token {
         address addr; // ERC20 Mainnet address

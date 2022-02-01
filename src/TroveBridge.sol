@@ -25,7 +25,7 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
     ITroveManager public constant troveManager = ITroveManager(0xA39739EF8b0231DbFA0DcdA07d7e29faAbCf4bb2);
     ISortedTroves public constant sortedTroves = ISortedTroves(0x8FdD3fbFEb32b28fb73555518f8b361bCeA741A6);
 
-    address payable public immutable rollupProcessor;
+    address public immutable rollupProcessor;
     uint256 public immutable initialICR; // ICR is an acronym for individual collateral ratio
     uint256 public immutable maxFee;
 
@@ -35,7 +35,7 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
      * @param _initialICRPerc Collateral ratio denominated in percents to be used when opening the Trove
      */
     constructor(
-        address payable _rollupProcessor,
+        address _rollupProcessor,
         uint256 _initialICRPerc,
         uint256 _maxFee
     ) public ERC20("TroveBridge", string(abi.encodePacked("TB-", _initialICRPerc.toString()))) {
