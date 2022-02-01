@@ -44,6 +44,14 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
         maxFee = _maxFee;
     }
 
+    /**
+     * @notice A function which opens the trove.
+     * @param _upperHint Address of a Trove with a position in the sorted list before the correct insert position.
+     * @param _lowerHint Address of a Trove with a position in the sorted list after the correct insert position.
+     * See https://github.com/liquity/dev#supplying-hints-to-trove-operations for more details about hints.
+     * @dev Sufficient amount of ETH has to be send so that at least 2000 LUSD gets borrowed. 2000 LUSD is a minimum
+     * amount allowed by Liquity.
+     */
     function openTrove(address _upperHint, address _lowerHint) external payable onlyOwner {
         // Note: I am not checking if the trove is already open because IBorrowerOperations.openTrove(...) checks it.
         uint256 amtToBorrow = computeAmtToBorrow(msg.value);
@@ -58,7 +66,7 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
     }
 
     /**
-     * @notice Function which stakes or unstakes LQTY to/from LQTYStaking.sol.
+     * @notice A function which stakes or unstakes LQTY to/from LQTYStaking.sol.
      * @dev This method can only be called from the RollupProcessor.sol. If the input asset is ETH, borrowing flow is
      * executed. If TB, repaying. RollupProcessor.sol has to transfer the tokens to the bridge before calling
      * the method. If this is not the case, the function will revert.
@@ -134,6 +142,10 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
         }
     }
 
+    /**
+     * @notice A function which closes the trove.
+     * @dev LUSD allowance has to be at least (remaining debt - 200).
+     */
     function closeTrove() public onlyOwner {
         require(troveManager.getTroveStatus(address(this)) == 1, "TroveBridge: INACTIVE_TROVE");
         address owner = owner();
