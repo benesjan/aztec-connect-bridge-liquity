@@ -14,7 +14,7 @@ contract TroveBridgeTest is TestUtil, IRollupProcessor {
     IHintHelpers private constant hintHelpers = IHintHelpers(0xE84251b93D9524E0d2e621Ba7dc7cb3579F997C0);
     ISortedTroves private constant sortedTroves = ISortedTroves(0x8FdD3fbFEb32b28fb73555518f8b361bCeA741A6);
 
-    function receiveEthFromBridge(uint256 interactionNonce) external override payable {}
+    function receiveEthFromBridge(uint256 interactionNonce) external payable override {}
 
     function setUp() public {
         setUpTokens();
@@ -67,6 +67,7 @@ contract TroveBridgeTest is TestUtil, IRollupProcessor {
     }
 
     function testBorrowRepaymentFlow() public {
+        // TODO: figure out how to make this test conditional on testOpenTrove without calling it directly
         testOpenTrove();
 
         // I will deposit and withdraw 1 ETH
@@ -130,8 +131,12 @@ contract TroveBridgeTest is TestUtil, IRollupProcessor {
             0
         );
 
+        // I want to check whether withdrawn amount of ETH is the same as the depositAmount.
+        // There is some imprecision so the amount is allowed to be different by 1 wei.
         uint256 changeInETH = address(this).balance.sub(balanceETHBeforeRepaying);
-
-        assertEq(changeInETH, depositAmount);
+        uint256 diffInETH = changeInETH < depositAmount
+            ? depositAmount.sub(changeInETH)
+            : changeInETH.sub(depositAmount);
+        assertLe(diffInETH, 1);
     }
 }
