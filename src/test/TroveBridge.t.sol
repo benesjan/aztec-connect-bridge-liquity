@@ -139,4 +139,22 @@ contract TroveBridgeTest is TestUtil, IRollupProcessor {
             : changeInETH.sub(depositAmount);
         assertLe(diffInETH, 1);
     }
+
+    function testCloseTrove() public {
+        // TODO: figure out how to make this test conditional on testBorrowRepaymentFlow without calling it directly
+        testBorrowRepaymentFlow();
+
+        (uint256 remainingDebt, , , ) = bridge.troveManager().getEntireDebtAndColl(address(bridge));
+        uint256 amountToRepay = remainingDebt.sub(200e18);
+        IERC20 lusdToken = IERC20(tokens["LUSD"].addr);
+        uint256 amountToMint = amountToRepay.sub(lusdToken.balanceOf(address(this)));
+
+        mint("LUSD", address(this), amountToMint);
+        lusdToken.approve(address(bridge), amountToRepay);
+
+        bridge.closeTrove();
+
+        uint256 troveStatus = bridge.troveManager().getTroveStatus(address(bridge));
+        assertEq(troveStatus, 2); // 2 equals closedByOwner status
+    }
 }

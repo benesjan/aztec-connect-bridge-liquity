@@ -134,7 +134,22 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
         }
     }
 
-    function closeTrove() public onlyOwner {}
+    function closeTrove() public onlyOwner {
+        require(troveManager.getTroveStatus(address(this)) == 1, "TroveBridge: INACTIVE_TROVE");
+        address owner = owner();
+        uint256 ownerTBBalance = balanceOf(owner);
+        require(ownerTBBalance == totalSupply(), "TroveBridge: OWNER_MUST_BE_LAST");
+
+        (uint256 remainingDebt, , , ) = troveManager.getEntireDebtAndColl(address(this));
+        // 200e18 is a part of debt which gets repaid from LUSD_GAS_COMPENSATION.
+        require(
+            IERC20(LUSD).transferFrom(owner, address(this), remainingDebt.sub(200e18)),
+            "TroveBridge: LUSD_TRANSFER_FAILED"
+        );
+
+        _burn(owner, ownerTBBalance);
+        operations.closeTrove();
+    }
 
     /**
      * @notice Compute how much LUSD to borrow against collateral in order to keep ICR constant and by how much total
