@@ -7,7 +7,7 @@ import "../Types.sol";
 import "../interfaces/ISortedTroves.sol";
 import "./TestUtil.sol";
 import "./interfaces/IHintHelpers.sol";
-import "./RollupProcessor.sol";
+import "./mocks/MockRollupProcessor.sol";
 
 contract TroveBridgeTest is TestUtil {
     address private rollupProcessor;
@@ -26,7 +26,7 @@ contract TroveBridgeTest is TestUtil {
         uint256 initialCollateralRatio = 250;
         uint256 maxFee = 5e16; // Slippage protection: 5%
 
-        rollupProcessor = address(new RollupProcessor());
+        rollupProcessor = address(new MockRollupProcessor());
 
         hevm.prank(OWNER);
         bridge = new TroveBridge(rollupProcessor, initialCollateralRatio, maxFee);
@@ -146,6 +146,10 @@ contract TroveBridgeTest is TestUtil {
             0
         );
 
+        // Check the bridge doesn't hold any ETH or LUSD
+        assertEq(address(bridge).balance, 0);
+        assertEq(LUSD_TOKEN.balanceOf(address(bridge)), 0);
+
         // I want to check whether withdrawn amount of ETH is the same as the ROLLUP_PROCESSOR_WEI_BALANCE.
         // There is some imprecision so the amount is allowed to be different by 1 wei.
         uint256 diffInETH = rollupProcessor.balance < ROLLUP_PROCESSOR_WEI_BALANCE
@@ -176,6 +180,17 @@ contract TroveBridgeTest is TestUtil {
 
         uint256 troveStatus = bridge.troveManager().getTroveStatus(address(bridge));
         assertEq(troveStatus, 2); // 2 equals closedByOwner status
+
+        // Check the bridge doesn't hold any ETH or LUSD
+        assertEq(address(bridge).balance, 0);
+        assertEq(LUSD_TOKEN.balanceOf(address(bridge)), 0);
+
+        // I want to check whether withdrawn amount of ETH is the same as the ROLLUP_PROCESSOR_WEI_BALANCE.
+        // There is some imprecision so the amount is allowed to be different by 1 wei.
+        uint256 diffInETH = OWNER.balance < OWNER_WEI_BALANCE
+            ? OWNER_WEI_BALANCE.sub(OWNER.balance)
+            : OWNER.balance.sub(OWNER_WEI_BALANCE);
+        assertLe(diffInETH, 1);
 
         hevm.stopPrank();
     }
