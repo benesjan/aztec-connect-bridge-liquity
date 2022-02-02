@@ -42,6 +42,38 @@ contract TroveBridgeTest is TestUtil {
         assertEq(uint256(bridge.decimals()), 18);
     }
 
+    function testFailIncorrectTroveState() public {
+        // Set msg.sender to ROLLUP_PROCESSOR
+        hevm.prank(rollupProcessor);
+
+        // Borrow when trove was not opened - state 0
+        bridge.convert(
+            Types.AztecAsset(3, address(0), Types.AztecAssetType.ETH),
+            Types.AztecAsset(0, address(0), Types.AztecAssetType.NOT_USED),
+            Types.AztecAsset(2, address(bridge), Types.AztecAssetType.ERC20),
+            Types.AztecAsset(1, LUSD_ADDR, Types.AztecAssetType.ERC20),
+            ROLLUP_PROCESSOR_WEI_BALANCE,
+            0,
+            0
+        );
+    }
+
+    function testFailIncorrectInput() public {
+        // Set msg.sender to ROLLUP_PROCESSOR
+        hevm.prank(rollupProcessor);
+
+        // Borrow when trove was not opened - state 0
+        bridge.convert(
+            Types.AztecAsset(0, address(0), Types.AztecAssetType.NOT_USED),
+            Types.AztecAsset(0, address(0), Types.AztecAssetType.NOT_USED),
+            Types.AztecAsset(0, address(0), Types.AztecAssetType.NOT_USED),
+            Types.AztecAsset(0, address(0), Types.AztecAssetType.NOT_USED),
+            0,
+            0,
+            0
+        );
+    }
+
     function _openTrove() private {
         // Set msg.sender to OWNER
         hevm.startPrank(OWNER);

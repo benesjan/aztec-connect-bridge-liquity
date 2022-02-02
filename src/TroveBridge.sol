@@ -71,16 +71,14 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
      * executed. If TB, repaying. RollupProcessor.sol has to transfer the tokens to the bridge before calling
      * the method. If this is not the case, the function will revert.
      *
-     * @param inputAssetA - ETH (Borrowing) or TB (Repaying)
-     * @param inputAssetB - None (Borrowing) or LUSD (Repaying)
-     * @param outputAssetA - TB (Borrowing) or ETH (Repaying)
-     * @param outputAssetB - LUSD (Borrowing) or None (Repaying)
-     * @param inputValue - the amount of ETH to borrow against (Borrowing) or the amount of TB to burn and LUSD debt to
-     * repay (Repaying)
-     * @return outputValueA - the amount of TB (Borrowing) or ETH (Repaying) minted/transferred to
-     * the RollupProcessor.sol
-     * @return outputValueB - the amount of LUSD (Borrowing) transferred to the the RollupProcessor.sol (0 when
-     * repaying)
+     *                              Borrowing               Repaying                Redeeming
+     * @param inputAssetA -         ETH                     TB                      TB
+     * @param inputAssetB -         None                    LUSD                    None
+     * @param outputAssetA -        TB                      ETH                     ETH
+     * @param outputAssetB -        LUSD                    None                    None
+     * @param inputValue -          amount of ETH           amount of TB and LUSD   amount of TB
+     * @return outputValueA -       amount of TB            amount of ETH           amount of ETH
+     * @return outputValueB -       amount of LUSD          0                       0
      */
     function convert(
         Types.AztecAsset calldata inputAssetA,
@@ -100,20 +98,20 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
             bool isAsync
         )
     {
-        // TODO: handle liquidations
         require(msg.sender == rollupProcessor, "TroveBridge: INVALID_CALLER");
-        require(troveManager.getTroveStatus(address(this)) == 1, "TroveBridge: INACTIVE_TROVE");
         isAsync = false;
+        uint256 troveStatus = troveManager.getTroveStatus(address(this));
 
         address upperHint = sortedTroves.getPrev(address(this));
         address lowerHint = sortedTroves.getNext(address(this));
 
-        if (inputAssetA.assetType == Types.AztecAssetType.ETH) {
+        if (
+            inputAssetA.assetType == Types.AztecAssetType.ETH &&
+            outputAssetA.erc20Address == address(this) &&
+            outputAssetB.erc20Address == LUSD
+        ) {
             // Borrowing
-            require(
-                outputAssetA.erc20Address == address(this) && outputAssetB.erc20Address == LUSD,
-                "TroveBridge: INCORRECT_BORROWING_INPUT"
-            );
+            require(troveStatus == 1, "TroveBridge: INACTIVE_TROVE");
             // outputValueA = by how much debt will increase and how much TB to mint
             uint256 outputValueB = computeAmtToBorrow(inputValue); // LUSD amount to borrow
 
@@ -126,19 +124,24 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
             _mint(rollupProcessor, outputValueA);
 
             require(IERC20(LUSD).transfer(rollupProcessor, outputValueB), "TroveBridge: LUSD_TRANSFER_FAILED");
-        } else {
+        } else if (
+            inputAssetA.erc20Address == address(this) &&
+            inputAssetB.erc20Address == LUSD &&
+            outputAssetA.assetType == Types.AztecAssetType.ETH
+        ) {
             // Repaying
-            require(
-                inputAssetA.erc20Address == address(this) &&
-                    inputAssetB.erc20Address == LUSD &&
-                    outputAssetA.assetType == Types.AztecAssetType.ETH,
-                "TroveBridge: INCORRECT_WITHDRAWING_INPUT"
-            );
+            require(troveStatus == 1, "TroveBridge: INACTIVE_TROVE");
             (, uint256 coll, , ) = troveManager.getEntireDebtAndColl(address(this));
             outputValueA = coll.mul(inputValue).div(this.totalSupply()); // Amount of collateral to withdraw
             operations.adjustTrove(maxFee, outputValueA, inputValue, false, upperHint, lowerHint);
             _burn(address(this), inputValue);
             IRollupProcessor(rollupProcessor).receiveEthFromBridge{value: outputValueA}(interactionNonce);
+        } else if (inputAssetA.erc20Address == address(this) && outputAssetA.assetType == Types.AztecAssetType.ETH) {
+            // Redeeming
+            require(troveStatus == 4, "TroveBridge: INACTIVE_TROVE");
+            // TODO
+        } else {
+            require(false, "TroveBridge: INCORRECT_INPUT");
         }
     }
 
