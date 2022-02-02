@@ -42,7 +42,7 @@ contract TroveBridgeTest is TestUtil {
         assertEq(uint256(bridge.decimals()), 18);
     }
 
-    function testOpenTrove() public {
+    function _openTrove() private {
         // Set msg.sender to OWNER
         hevm.startPrank(OWNER);
 
@@ -82,10 +82,7 @@ contract TroveBridgeTest is TestUtil {
         hevm.stopPrank();
     }
 
-    function testBorrowRepaymentFlow() public {
-        // TODO: figure out how to make this test conditional on testOpenTrove without calling it directly
-        testOpenTrove();
-
+    function _borrow() private {
         // Set msg.sender to ROLLUP_PROCESSOR
         hevm.startPrank(rollupProcessor);
 
@@ -125,6 +122,13 @@ contract TroveBridgeTest is TestUtil {
         assertEq(address(bridge).balance, 0);
         assertEq(LUSD_TOKEN.balanceOf(address(bridge)), 0);
 
+        hevm.stopPrank();
+    }
+
+    function _repay() private {
+        // Set msg.sender to ROLLUP_PROCESSOR
+        hevm.startPrank(rollupProcessor);
+
         uint256 processorTBBalance = bridge.balanceOf(rollupProcessor);
         uint256 processorLUSDBalance = LUSD_TOKEN.balanceOf(rollupProcessor);
 
@@ -160,10 +164,7 @@ contract TroveBridgeTest is TestUtil {
         hevm.stopPrank();
     }
 
-    function testCloseTrove() public {
-        // TODO: figure out how to make this test conditional on testBorrowRepaymentFlow without calling it directly
-        testBorrowRepaymentFlow();
-
+    function _closeTrove() private {
         // Set msg.sender to OWNER
         hevm.startPrank(OWNER);
 
@@ -195,8 +196,19 @@ contract TroveBridgeTest is TestUtil {
         hevm.stopPrank();
     }
 
+    function testFullFlow() public {
+        // This is the only way how to make 1 part of test depend on another in DSTest because tests are otherwise ran
+        // in parallel in different EVM instances. For this reason these parts of tests can't be evaluated individually
+        // unless ran repeatedly.
+        _openTrove();
+        _borrow();
+        _repay();
+        _closeTrove();
+    }
+
     function testLiquidationFlow() public {
-        testOpenTrove();
+        _openTrove();
+        _borrow();
         dropLiquityPriceByHalf();
 
         bridge.troveManager().liquidate(address(bridge));
