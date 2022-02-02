@@ -16,7 +16,7 @@ contract TroveBridgeTest is TestUtil {
     IHintHelpers private constant hintHelpers = IHintHelpers(0xE84251b93D9524E0d2e621Ba7dc7cb3579F997C0);
     ISortedTroves private constant sortedTroves = ISortedTroves(0x8FdD3fbFEb32b28fb73555518f8b361bCeA741A6);
 
-    address private constant OWNER = address(1);
+    address private constant OWNER = address(24);
 
     uint256 private constant OWNER_WEI_BALANCE = 5e18; // 5 ETH
     uint256 private constant ROLLUP_PROCESSOR_WEI_BALANCE = 1e18; // 1 ETH

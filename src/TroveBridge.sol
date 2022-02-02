@@ -148,7 +148,7 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
      */
     function closeTrove() public onlyOwner {
         require(troveManager.getTroveStatus(address(this)) == 1, "TroveBridge: INACTIVE_TROVE");
-        address owner = owner();
+        address payable owner = payable(owner());
         uint256 ownerTBBalance = balanceOf(owner);
         require(ownerTBBalance == totalSupply(), "TroveBridge: OWNER_MUST_BE_LAST");
 
@@ -161,6 +161,7 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
 
         _burn(owner, ownerTBBalance);
         operations.closeTrove();
+        owner.transfer(address(this).balance);
     }
 
     /**
