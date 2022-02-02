@@ -23,7 +23,7 @@ contract TroveBridgeTest is TestUtil {
 
     function setUp() public {
         setUpTokens();
-        uint256 initialCollateralRatio = 250;
+        uint256 initialCollateralRatio = 200;
         uint256 maxFee = 5e16; // Slippage protection: 5%
 
         rollupProcessor = address(new MockRollupProcessor());
@@ -38,7 +38,7 @@ contract TroveBridgeTest is TestUtil {
 
     function testInitialERC20Params() public {
         assertEq(bridge.name(), "TroveBridge");
-        assertEq(bridge.symbol(), "TB-250");
+        assertEq(bridge.symbol(), "TB-200");
         assertEq(uint256(bridge.decimals()), 18);
     }
 
@@ -62,7 +62,7 @@ contract TroveBridgeTest is TestUtil {
         uint256 price = bridge.troveManager().priceFeed().fetchPrice();
         uint256 ICR = bridge.troveManager().getCurrentICR(address(bridge), price);
         // Verify the ICR equals the one specified in the bridge constructor
-        assertEq(ICR, 250e16);
+        assertEq(ICR, 200e16);
 
         (uint256 debtAfterBorrowing, uint256 collAfterBorrowing, , ) = bridge.troveManager().getEntireDebtAndColl(
             address(bridge)
@@ -194,4 +194,17 @@ contract TroveBridgeTest is TestUtil {
 
         hevm.stopPrank();
     }
+
+    function testLiquidationFlow() public {
+        testOpenTrove();
+        dropLiquityPriceByHalf();
+
+        bridge.troveManager().liquidate(address(bridge));
+
+        uint256 troveStatus = bridge.troveManager().getTroveStatus(address(bridge));
+        assertEq(troveStatus, 3); // 3 equals closedByLiquidation status
+    }
+
+    // Here so that I can successfully liquidate trove from this contract.
+    fallback() external payable {}
 }

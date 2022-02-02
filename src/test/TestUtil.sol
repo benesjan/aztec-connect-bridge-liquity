@@ -43,6 +43,8 @@ contract TestUtil is DSTest {
         uint256 slot; // Balance storage slot
     }
 
+    address internal constant LIQUITY_PRICE_FEED_ADDR = 0x4c517D4e2C851CA76d7eC94B805269Df0f2201De;
+
     mapping(bytes32 => Token) internal tokens;
 
     constructor() public {
@@ -85,10 +87,14 @@ contract TestUtil is DSTest {
 
     function setLiquityPrice(uint256 price) public {
         IPriceFeed mockFeed = new MockPriceFeed(price);
-        address liquityPriceFeed = 0x4c517D4e2C851CA76d7eC94B805269Df0f2201De;
-        hevm.etch(liquityPriceFeed, _getCode(address(mockFeed)));
-        IPriceFeed feed = IPriceFeed(liquityPriceFeed);
+        hevm.etch(LIQUITY_PRICE_FEED_ADDR, _getCode(address(mockFeed)));
+        IPriceFeed feed = IPriceFeed(LIQUITY_PRICE_FEED_ADDR);
         assertEq(feed.fetchPrice(), price);
+    }
+
+    function dropLiquityPriceByHalf() public {
+        uint256 currentPrice = IPriceFeed(LIQUITY_PRICE_FEED_ADDR).fetchPrice();
+        setLiquityPrice(currentPrice.div(2));
     }
 
     /*
