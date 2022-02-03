@@ -21,9 +21,17 @@ contract TroveBridgeTest is TestUtil {
     uint256 private constant OWNER_WEI_BALANCE = 5e18; // 5 ETH
     uint256 private constant ROLLUP_PROCESSOR_WEI_BALANCE = 1e18; // 1 ETH
 
+    enum Status {
+        nonExistent,
+        active,
+        closedByOwner,
+        closedByLiquidation,
+        closedByRedemption
+    }
+
     function setUp() public {
         setUpTokens();
-        uint256 initialCollateralRatio = 200;
+        uint256 initialCollateralRatio = 160;
         uint256 maxFee = 5e16; // Slippage protection: 5%
 
         rollupProcessor = address(new MockRollupProcessor());
@@ -38,7 +46,7 @@ contract TroveBridgeTest is TestUtil {
 
     function testInitialERC20Params() public {
         assertEq(bridge.name(), "TroveBridge");
-        assertEq(bridge.symbol(), "TB-200");
+        assertEq(bridge.symbol(), "TB-160");
         assertEq(uint256(bridge.decimals()), 18);
     }
 
@@ -94,7 +102,7 @@ contract TroveBridgeTest is TestUtil {
         uint256 price = bridge.troveManager().priceFeed().fetchPrice();
         uint256 ICR = bridge.troveManager().getCurrentICR(address(bridge), price);
         // Verify the ICR equals the one specified in the bridge constructor
-        assertEq(ICR, 200e16);
+        assertEq(ICR, 160e16);
 
         (uint256 debtAfterBorrowing, uint256 collAfterBorrowing, , ) = bridge.troveManager().getEntireDebtAndColl(
             address(bridge)
@@ -211,8 +219,8 @@ contract TroveBridgeTest is TestUtil {
 
         bridge.closeTrove();
 
-        uint256 troveStatus = bridge.troveManager().getTroveStatus(address(bridge));
-        assertEq(troveStatus, 2); // 2 equals closedByOwner status
+        Status troveStatus = Status(bridge.troveManager().getTroveStatus(address(bridge)));
+        assertTrue(troveStatus == Status.closedByOwner);
 
         // Check the bridge doesn't hold any ETH or LUSD
         assertEq(address(bridge).balance, 0);
@@ -241,14 +249,29 @@ contract TroveBridgeTest is TestUtil {
     function testLiquidationFlow() public {
         _openTrove();
         _borrow();
+
+        // Drop price and liquidate the trove
         dropLiquityPriceByHalf();
-
         bridge.troveManager().liquidate(address(bridge));
-
-        uint256 troveStatus = bridge.troveManager().getTroveStatus(address(bridge));
-        assertEq(troveStatus, 3); // 3 equals closedByLiquidation status
+        Status troveStatus = Status(bridge.troveManager().getTroveStatus(address(bridge)));
+        assertTrue(troveStatus == Status.closedByLiquidation);
+        // TODO
     }
 
-    // Here so that I can successfully liquidate trove from this contract.
+    function testRedeemFlow() public {
+        _openTrove();
+        _borrow();
+
+        // Mint 40 million LUSD and redeem
+        uint256 amountToRedeem = 4e25;
+        mint("LUSD", address(this), amountToRedeem);
+
+        bridge.troveManager().redeemCollateral(amountToRedeem, address(0), address(0), address(0), 0, 0, 5e16);
+        Status troveStatus = Status(bridge.troveManager().getTroveStatus(address(bridge)));
+        assertTrue(troveStatus == Status.closedByRedemption);
+        // TODO
+    }
+
+    // Here so that I can successfully liquidate a trove from within this contract.
     fallback() external payable {}
 }
