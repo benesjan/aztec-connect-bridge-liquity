@@ -82,6 +82,42 @@ contract TroveBridgeTest is TestUtil {
         );
     }
 
+    function testFullFlow() public {
+        // This is the only way how to make 1 part of test depend on another in DSTest because tests are otherwise ran
+        // in parallel in different EVM instances. For this reason these parts of tests can't be evaluated individually
+        // unless ran repeatedly.
+        _openTrove();
+        _borrow();
+        _repay();
+        _closeTrove();
+    }
+
+    function testLiquidationFlow() public {
+        _openTrove();
+        _borrow();
+
+        // Drop price and liquidate the trove
+        dropLiquityPriceByHalf();
+        bridge.troveManager().liquidate(address(bridge));
+        Status troveStatus = Status(bridge.troveManager().getTroveStatus(address(bridge)));
+        assertTrue(troveStatus == Status.closedByLiquidation);
+        // TODO
+    }
+
+    function testRedeemFlow() public {
+        _openTrove();
+        _borrow();
+
+        // Mint 40 million LUSD and redeem
+        uint256 amountToRedeem = 4e25;
+        mint("LUSD", address(this), amountToRedeem);
+
+        bridge.troveManager().redeemCollateral(amountToRedeem, address(0), address(0), address(0), 0, 0, 5e16);
+        Status troveStatus = Status(bridge.troveManager().getTroveStatus(address(bridge)));
+        assertTrue(troveStatus == Status.closedByRedemption);
+        // TODO
+    }
+
     function _openTrove() private {
         // Set msg.sender to OWNER
         hevm.startPrank(OWNER);
@@ -197,8 +233,8 @@ contract TroveBridgeTest is TestUtil {
         // I want to check whether withdrawn amount of ETH is the same as the ROLLUP_PROCESSOR_WEI_BALANCE.
         // There is some imprecision so the amount is allowed to be different by 1 wei.
         uint256 diffInETH = rollupProcessor.balance < ROLLUP_PROCESSOR_WEI_BALANCE
-            ? ROLLUP_PROCESSOR_WEI_BALANCE.sub(rollupProcessor.balance)
-            : rollupProcessor.balance.sub(ROLLUP_PROCESSOR_WEI_BALANCE);
+        ? ROLLUP_PROCESSOR_WEI_BALANCE.sub(rollupProcessor.balance)
+        : rollupProcessor.balance.sub(ROLLUP_PROCESSOR_WEI_BALANCE);
         assertLe(diffInETH, 1);
 
         hevm.stopPrank();
@@ -229,47 +265,11 @@ contract TroveBridgeTest is TestUtil {
         // I want to check whether withdrawn amount of ETH is the same as the ROLLUP_PROCESSOR_WEI_BALANCE.
         // There is some imprecision so the amount is allowed to be different by 1 wei.
         uint256 diffInETH = OWNER.balance < OWNER_WEI_BALANCE
-            ? OWNER_WEI_BALANCE.sub(OWNER.balance)
-            : OWNER.balance.sub(OWNER_WEI_BALANCE);
+        ? OWNER_WEI_BALANCE.sub(OWNER.balance)
+        : OWNER.balance.sub(OWNER_WEI_BALANCE);
         assertLe(diffInETH, 1);
 
         hevm.stopPrank();
-    }
-
-    function testFullFlow() public {
-        // This is the only way how to make 1 part of test depend on another in DSTest because tests are otherwise ran
-        // in parallel in different EVM instances. For this reason these parts of tests can't be evaluated individually
-        // unless ran repeatedly.
-        _openTrove();
-        _borrow();
-        _repay();
-        _closeTrove();
-    }
-
-    function testLiquidationFlow() public {
-        _openTrove();
-        _borrow();
-
-        // Drop price and liquidate the trove
-        dropLiquityPriceByHalf();
-        bridge.troveManager().liquidate(address(bridge));
-        Status troveStatus = Status(bridge.troveManager().getTroveStatus(address(bridge)));
-        assertTrue(troveStatus == Status.closedByLiquidation);
-        // TODO
-    }
-
-    function testRedeemFlow() public {
-        _openTrove();
-        _borrow();
-
-        // Mint 40 million LUSD and redeem
-        uint256 amountToRedeem = 4e25;
-        mint("LUSD", address(this), amountToRedeem);
-
-        bridge.troveManager().redeemCollateral(amountToRedeem, address(0), address(0), address(0), 0, 0, 5e16);
-        Status troveStatus = Status(bridge.troveManager().getTroveStatus(address(bridge)));
-        assertTrue(troveStatus == Status.closedByRedemption);
-        // TODO
     }
 
     // Here so that I can successfully liquidate a trove from within this contract.
