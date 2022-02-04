@@ -101,7 +101,13 @@ contract TroveBridgeTest is TestUtil {
         bridge.troveManager().liquidate(address(bridge));
         Status troveStatus = Status(bridge.troveManager().getTroveStatus(address(bridge)));
         assertTrue(troveStatus == Status.closedByLiquidation);
-        // TODO
+
+        // Set msg.sender to OWNER
+        hevm.prank(OWNER);
+        bridge.closeTrove();
+
+        // Check that all balances have been wiped
+        assertEq(bridge.totalSupply(), 0);
     }
 
     function testRedeemFlow() public {

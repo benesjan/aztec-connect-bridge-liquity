@@ -172,14 +172,18 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
         uint256 _totalSupply = totalSupply();
         require(_totalSupply != 0, "TroveBridge: ZERO_TOTAL_SUPPLY");
 
+        address payable owner = payable(owner());
+        uint256 ownerTBBalance = balanceOf(owner);
+
         Status troveStatus = Status(troveManager.getTroveStatus(address(this)));
 
         if (troveStatus == Status.closedByLiquidation) {
             // Trove was liquidated. Wipe all the balances.
-            // TODO
+            // TODO: is this ok or are ERC20 balances withdrawable from RollupProcessor.sol to non-bridge L1 address?
+            // If they are withdrawable this is a potential vulnerability!!!
+            _burn(owner, ownerTBBalance);
+            _burn(rollupProcessor, this.balanceOf(rollupProcessor));
         } else {
-            address payable owner = payable(owner());
-            uint256 ownerTBBalance = balanceOf(owner);
             require(ownerTBBalance == _totalSupply, "TroveBridge: OWNER_MUST_BE_LAST");
 
             _burn(owner, ownerTBBalance);
