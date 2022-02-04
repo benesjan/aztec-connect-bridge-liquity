@@ -325,6 +325,8 @@ contract TroveBridgeTest is TestUtil {
         hevm.stopPrank();
     }
 
+    receive() external payable {}
+
     // Here so that I can successfully liquidate a trove from within this contract.
     fallback() external payable {}
 }

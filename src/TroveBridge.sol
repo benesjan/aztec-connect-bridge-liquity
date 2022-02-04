@@ -126,7 +126,7 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
             // Borrowing
             require(troveStatus == Status.active, "TroveBridge: INACTIVE_TROVE");
             // outputValueA = by how much debt will increase and how much TB to mint
-            uint256 outputValueB = computeAmtToBorrow(inputValue); // LUSD amount to borrow
+            outputValueB = computeAmtToBorrow(inputValue); // LUSD amount to borrow
 
             (uint256 debtBefore, , , ) = troveManager.getEntireDebtAndColl(address(this));
             operations.adjustTrove{value: inputValue}(maxFee, 0, outputValueB, true, upperHint, lowerHint);
