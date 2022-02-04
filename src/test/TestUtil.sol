@@ -103,7 +103,7 @@ contract TestUtil is DSTest {
      *
      * @dev I am using assembly here because solidity versions <0.8.0 do not have address.code attribute.
      */
-    function _getCode(address _addr) private view returns (bytes memory o_code) {
+    function _getCode(address _addr) private view returns (bytes memory code) {
         assembly {
             // retrieve the size of the code, this needs assembly
             let size := extcodesize(_addr)

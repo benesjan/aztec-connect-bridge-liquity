@@ -21,6 +21,9 @@ contract TroveBridgeTest is TestUtil {
     uint256 private constant OWNER_WEI_BALANCE = 5e18; // 5 ETH
     uint256 private constant ROLLUP_PROCESSOR_WEI_BALANCE = 1e18; // 1 ETH
 
+    // From LiquityMath.sol
+    uint256 private constant NICR_PRECISION = 1e20;
+
     enum Status {
         nonExistent,
         active,
@@ -130,22 +133,21 @@ contract TroveBridgeTest is TestUtil {
         hevm.startPrank(OWNER);
 
         uint256 amtToBorrow = bridge.computeAmtToBorrow(OWNER_WEI_BALANCE);
-        uint256 NICR_PRECISION = 1e20;
-        uint256 NICR = OWNER_WEI_BALANCE.mul(NICR_PRECISION).div(amtToBorrow);
+        uint256 nicr = OWNER_WEI_BALANCE.mul(NICR_PRECISION).div(amtToBorrow);
 
         // The following is Solidity implementation of https://github.com/liquity/dev#opening-a-trove
         uint256 numTrials = 15;
         uint256 randomSeed = 42;
-        (address approxHint, , ) = hintHelpers.getApproxHint(NICR, numTrials, randomSeed);
-        (address upperHint, address lowerHint) = sortedTroves.findInsertPosition(NICR, approxHint, approxHint);
+        (address approxHint, , ) = hintHelpers.getApproxHint(nicr, numTrials, randomSeed);
+        (address upperHint, address lowerHint) = sortedTroves.findInsertPosition(nicr, approxHint, approxHint);
 
         // Open the trove
         bridge.openTrove{value: OWNER_WEI_BALANCE}(upperHint, lowerHint);
 
         uint256 price = bridge.troveManager().priceFeed().fetchPrice();
-        uint256 ICR = bridge.troveManager().getCurrentICR(address(bridge), price);
+        uint256 icr = bridge.troveManager().getCurrentICR(address(bridge), price);
         // Verify the ICR equals the one specified in the bridge constructor
-        assertEq(ICR, 160e16);
+        assertEq(icr, 160e16);
 
         (uint256 debtAfterBorrowing, uint256 collAfterBorrowing, , ) = bridge.troveManager().getEntireDebtAndColl(
             address(bridge)
@@ -155,8 +157,8 @@ contract TroveBridgeTest is TestUtil {
         // Check the trove's collateral equals deposit amount
         assertEq(collAfterBorrowing, OWNER_WEI_BALANCE);
 
-        uint256 LUSDBalance = tokens["LUSD"].erc.balanceOf(OWNER);
-        assertEq(LUSDBalance, amtToBorrow);
+        uint256 lusdBalance = tokens["LUSD"].erc.balanceOf(OWNER);
+        assertEq(lusdBalance, amtToBorrow);
 
         // Check the bridge doesn't hold any ETH or LUSD
         assertEq(address(bridge).balance, 0);
@@ -173,7 +175,7 @@ contract TroveBridgeTest is TestUtil {
         require(address(bridge).send(ROLLUP_PROCESSOR_WEI_BALANCE), "TroveBridgeTest: ETH_TRANSFER_FAILED");
 
         uint256 price = bridge.troveManager().priceFeed().fetchPrice();
-        uint256 ICRBeforeBorrowing = bridge.troveManager().getCurrentICR(address(bridge), price);
+        uint256 icrBeforeBorrowing = bridge.troveManager().getCurrentICR(address(bridge), price);
 
         (, uint256 collBeforeBorrowing, , ) = bridge.troveManager().getEntireDebtAndColl(address(bridge));
 
@@ -194,9 +196,9 @@ contract TroveBridgeTest is TestUtil {
         // Check the collateral increase equals ROLLUP_PROCESSOR_WEI_BALANCE
         assertEq(collAfterBorrowing.sub(collBeforeBorrowing), ROLLUP_PROCESSOR_WEI_BALANCE);
 
-        uint256 ICRAfterBorrowing = bridge.troveManager().getCurrentICR(address(bridge), price);
+        uint256 icrAfterBorrowing = bridge.troveManager().getCurrentICR(address(bridge), price);
         // Check the the ICR didn't change
-        assertEq(ICRBeforeBorrowing, ICRAfterBorrowing);
+        assertEq(icrBeforeBorrowing, icrAfterBorrowing);
 
         // Check the TB total supply equals totalDebt
         assertEq(IERC20(address(bridge)).totalSupply(), debtAfterBorrowing);

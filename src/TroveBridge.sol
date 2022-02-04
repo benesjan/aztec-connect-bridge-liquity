@@ -231,8 +231,8 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
         bool isRecoveryMode = troveManager.checkRecoveryMode(price);
         if (troveManager.getTroveStatus(address(this)) == 1) {
             // Trove is active - use current ICR and not the initial one
-            uint256 ICR = troveManager.getCurrentICR(address(this), price);
-            amtToBorrow = _coll.mul(price).div(ICR);
+            uint256 icr = troveManager.getCurrentICR(address(this), price);
+            amtToBorrow = _coll.mul(price).div(icr);
             if (!isRecoveryMode) {
                 // Liquity is not in recovery mode so borrowing fee applies
                 uint256 borrowingRate = troveManager.getBorrowingRateWithDecay();
