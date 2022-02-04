@@ -6,6 +6,7 @@ pragma solidity 0.6.11;
 import "../../lib/openzeppelin-contracts/contracts/math/SafeMath.sol";
 import "../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import "../../lib/ds-test/src/test.sol";
+import "./mocks/MockPriceFeed.sol";
 
 interface Hevm {
     function store(
@@ -13,6 +14,16 @@ interface Hevm {
         bytes32,
         bytes32
     ) external;
+
+    function prank(address) external;
+
+    function startPrank(address) external;
+
+    function stopPrank() external;
+
+    function deal(address, uint256) external;
+
+    function etch(address, bytes calldata) external;
 }
 
 contract TestUtil is DSTest {
@@ -20,12 +31,19 @@ contract TestUtil is DSTest {
 
     Hevm internal hevm;
 
+    // TODO: remove the following and simply use 1e18
     uint256 internal constant WAD = 10**18;
+
+    // TODO: refactor setUpTokens and use the following constants in all the tests
+    address internal constant LUSD_ADDR = 0x5f98805A4E8be255a32880FDeC7F6728C6568bA0;
+    IERC20 internal constant LUSD_TOKEN = IERC20(0x5f98805A4E8be255a32880FDeC7F6728C6568bA0);
 
     struct Token {
         address addr; // ERC20 Mainnet address
         uint256 slot; // Balance storage slot
     }
+
+    address internal constant LIQUITY_PRICE_FEED_ADDR = 0x4c517D4e2C851CA76d7eC94B805269Df0f2201De;
 
     mapping(bytes32 => Token) internal tokens;
 
@@ -65,5 +83,40 @@ contract TestUtil is DSTest {
     function rand(uint256 seed) public pure returns (uint256) {
         // I want a number between 1 WAD and 10 million WAD
         return uint256(keccak256(abi.encodePacked(seed))) % 10**25;
+    }
+
+    function setLiquityPrice(uint256 price) public {
+        IPriceFeed mockFeed = new MockPriceFeed(price);
+        hevm.etch(LIQUITY_PRICE_FEED_ADDR, _getCode(address(mockFeed)));
+        IPriceFeed feed = IPriceFeed(LIQUITY_PRICE_FEED_ADDR);
+        assertEq(feed.fetchPrice(), price);
+    }
+
+    function dropLiquityPriceByHalf() public {
+        uint256 currentPrice = IPriceFeed(LIQUITY_PRICE_FEED_ADDR).fetchPrice();
+        setLiquityPrice(currentPrice.div(2));
+    }
+
+    /*
+     * @notice Loads contract code at address.
+     *
+     * @param _addr Address of the contract.
+     *
+     * @dev I am using assembly here because solidity versions <0.8.0 do not have address.code attribute.
+     */
+    function _getCode(address _addr) private view returns (bytes memory o_code) {
+        assembly {
+            // retrieve the size of the code, this needs assembly
+            let size := extcodesize(_addr)
+            // allocate output byte array - this could also be done without assembly
+            // by using o_code = new bytes(size)
+            o_code := mload(0x40)
+            // new "memory end" including padding
+            mstore(0x40, add(o_code, and(add(add(size, 0x20), 0x1f), not(0x1f))))
+            // store length in memory
+            mstore(o_code, size)
+            // actually retrieve the code, this needs assembly
+            extcodecopy(_addr, add(o_code, 0x20), 0, size)
+        }
     }
 }
