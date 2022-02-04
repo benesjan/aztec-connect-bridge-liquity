@@ -12,7 +12,7 @@ contract StakingBridgeTestInternal is TestUtil, StakingBridge(address(0)) {
     }
 
     function testSwapRewardsToLQTY() public {
-        mint("LUSD", address(this), 1000 * WAD);
+        mint("LUSD", address(this), 1e21);
 
         // Note: to make the tests faster I will burn most of the ETH. This contract gets 79 million ETH by default.
         // This makes swapping through Uni v3 slow as it has the loop through the ticks for many seconds
@@ -26,9 +26,9 @@ contract StakingBridgeTestInternal is TestUtil, StakingBridge(address(0)) {
         assertGt(stakedLQTYAfterSwap, stakedLQTYBeforeSwap);
 
         // Verify that all the rewards were swapped and staked
-        assertEq(IERC20(tokens["WETH"].addr).balanceOf(address(this)), 0);
-        assertEq(IERC20(tokens["LUSD"].addr).balanceOf(address(this)), 0);
-        assertEq(IERC20(tokens["LQTY"].addr).balanceOf(address(this)), 0);
+        assertEq(tokens["WETH"].erc.balanceOf(address(this)), 0);
+        assertEq(tokens["LUSD"].erc.balanceOf(address(this)), 0);
+        assertEq(tokens["LQTY"].erc.balanceOf(address(this)), 0);
         assertEq(address(this).balance, 0);
     }
 }

@@ -31,16 +31,10 @@ contract TestUtil is DSTest {
 
     Hevm internal hevm;
 
-    // TODO: remove the following and simply use 1e18
-    uint256 internal constant WAD = 10**18;
-
-    // TODO: refactor setUpTokens and use the following constants in all the tests
-    address internal constant LUSD_ADDR = 0x5f98805A4E8be255a32880FDeC7F6728C6568bA0;
-    IERC20 internal constant LUSD_TOKEN = IERC20(0x5f98805A4E8be255a32880FDeC7F6728C6568bA0);
-
     struct Token {
         address addr; // ERC20 Mainnet address
         uint256 slot; // Balance storage slot
+        IERC20 erc;
     }
 
     address internal constant LIQUITY_PRICE_FEED_ADDR = 0x4c517D4e2C851CA76d7eC94B805269Df0f2201De;
@@ -53,10 +47,15 @@ contract TestUtil is DSTest {
 
     function setUpTokens() public {
         tokens["LUSD"].addr = 0x5f98805A4E8be255a32880FDeC7F6728C6568bA0;
+        tokens["LUSD"].erc = IERC20(tokens["LUSD"].addr);
         tokens["LUSD"].slot = 2;
+
         tokens["WETH"].addr = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+        tokens["WETH"].erc = IERC20(tokens["WETH"].addr);
         tokens["WETH"].slot = 3;
+
         tokens["LQTY"].addr = 0x6DEA81C8171D0bA574754EF6F8b412F2Ed88c54D;
+        tokens["LQTY"].erc = IERC20(tokens["LQTY"].addr);
         tokens["LQTY"].slot = 0;
     }
 

@@ -59,7 +59,7 @@ contract TroveBridgeTest is TestUtil {
             Types.AztecAsset(3, address(0), Types.AztecAssetType.ETH),
             Types.AztecAsset(0, address(0), Types.AztecAssetType.NOT_USED),
             Types.AztecAsset(2, address(bridge), Types.AztecAssetType.ERC20),
-            Types.AztecAsset(1, LUSD_ADDR, Types.AztecAssetType.ERC20),
+            Types.AztecAsset(1, tokens["LUSD"].addr, Types.AztecAssetType.ERC20),
             ROLLUP_PROCESSOR_WEI_BALANCE,
             0,
             0
@@ -155,12 +155,12 @@ contract TroveBridgeTest is TestUtil {
         // Check the trove's collateral equals deposit amount
         assertEq(collAfterBorrowing, OWNER_WEI_BALANCE);
 
-        uint256 LUSDBalance = LUSD_TOKEN.balanceOf(OWNER);
+        uint256 LUSDBalance = tokens["LUSD"].erc.balanceOf(OWNER);
         assertEq(LUSDBalance, amtToBorrow);
 
         // Check the bridge doesn't hold any ETH or LUSD
         assertEq(address(bridge).balance, 0);
-        assertEq(LUSD_TOKEN.balanceOf(address(bridge)), 0);
+        assertEq(tokens["LUSD"].erc.balanceOf(address(bridge)), 0);
 
         hevm.stopPrank();
     }
@@ -182,7 +182,7 @@ contract TroveBridgeTest is TestUtil {
             Types.AztecAsset(3, address(0), Types.AztecAssetType.ETH),
             Types.AztecAsset(0, address(0), Types.AztecAssetType.NOT_USED),
             Types.AztecAsset(2, address(bridge), Types.AztecAssetType.ERC20),
-            Types.AztecAsset(1, LUSD_ADDR, Types.AztecAssetType.ERC20),
+            Types.AztecAsset(1, tokens["LUSD"].addr, Types.AztecAssetType.ERC20),
             ROLLUP_PROCESSOR_WEI_BALANCE,
             0,
             0
@@ -203,7 +203,7 @@ contract TroveBridgeTest is TestUtil {
 
         // Check the bridge doesn't hold any ETH or LUSD
         assertEq(address(bridge).balance, 0);
-        assertEq(LUSD_TOKEN.balanceOf(address(bridge)), 0);
+        assertEq(tokens["LUSD"].erc.balanceOf(address(bridge)), 0);
 
         hevm.stopPrank();
     }
@@ -213,7 +213,7 @@ contract TroveBridgeTest is TestUtil {
         hevm.startPrank(rollupProcessor);
 
         uint256 processorTBBalance = bridge.balanceOf(rollupProcessor);
-        uint256 processorLUSDBalance = LUSD_TOKEN.balanceOf(rollupProcessor);
+        uint256 processorLUSDBalance = tokens["LUSD"].erc.balanceOf(rollupProcessor);
 
         uint256 borrowerFee = processorTBBalance.sub(processorLUSDBalance);
         // Mint the borrower fee to ROLLUP_PROCESSOR in order to have a big enough balance for repaying
@@ -221,11 +221,14 @@ contract TroveBridgeTest is TestUtil {
 
         // Transfer TB and LUSD to the bridge before repaying
         require(bridge.transfer(address(bridge), processorTBBalance), "TroveBridgeTest: TB_TRANSFER_FAILED");
-        require(LUSD_TOKEN.transfer(address(bridge), processorTBBalance), "TroveBridgeTest: LUSD_TRANSFER_FAILED");
+        require(
+            tokens["LUSD"].erc.transfer(address(bridge), processorTBBalance),
+            "TroveBridgeTest: LUSD_TRANSFER_FAILED"
+        );
 
         bridge.convert(
             Types.AztecAsset(2, address(bridge), Types.AztecAssetType.ERC20),
-            Types.AztecAsset(1, LUSD_ADDR, Types.AztecAssetType.ERC20),
+            Types.AztecAsset(1, tokens["LUSD"].addr, Types.AztecAssetType.ERC20),
             Types.AztecAsset(3, address(0), Types.AztecAssetType.ETH),
             Types.AztecAsset(0, address(0), Types.AztecAssetType.NOT_USED),
             processorTBBalance,
@@ -235,13 +238,13 @@ contract TroveBridgeTest is TestUtil {
 
         // Check the bridge doesn't hold any ETH or LUSD
         assertEq(address(bridge).balance, 0);
-        assertEq(LUSD_TOKEN.balanceOf(address(bridge)), 0);
+        assertEq(tokens["LUSD"].erc.balanceOf(address(bridge)), 0);
 
         // I want to check whether withdrawn amount of ETH is the same as the ROLLUP_PROCESSOR_WEI_BALANCE.
         // There is some imprecision so the amount is allowed to be different by 1 wei.
         uint256 diffInETH = rollupProcessor.balance < ROLLUP_PROCESSOR_WEI_BALANCE
-        ? ROLLUP_PROCESSOR_WEI_BALANCE.sub(rollupProcessor.balance)
-        : rollupProcessor.balance.sub(ROLLUP_PROCESSOR_WEI_BALANCE);
+            ? ROLLUP_PROCESSOR_WEI_BALANCE.sub(rollupProcessor.balance)
+            : rollupProcessor.balance.sub(ROLLUP_PROCESSOR_WEI_BALANCE);
         assertLe(diffInETH, 1);
 
         hevm.stopPrank();
@@ -252,13 +255,13 @@ contract TroveBridgeTest is TestUtil {
         hevm.startPrank(OWNER);
 
         uint256 ownerTBBalance = bridge.balanceOf(OWNER);
-        uint256 ownerLUSDBalance = LUSD_TOKEN.balanceOf(OWNER);
+        uint256 ownerLUSDBalance = tokens["LUSD"].erc.balanceOf(OWNER);
 
         uint256 borrowerFee = ownerTBBalance.sub(ownerLUSDBalance).sub(200e18);
         uint256 amountToRepay = ownerLUSDBalance.add(borrowerFee);
 
         mint("LUSD", OWNER, borrowerFee);
-        LUSD_TOKEN.approve(address(bridge), amountToRepay);
+        tokens["LUSD"].erc.approve(address(bridge), amountToRepay);
 
         bridge.closeTrove();
 
@@ -267,13 +270,13 @@ contract TroveBridgeTest is TestUtil {
 
         // Check the bridge doesn't hold any ETH or LUSD
         assertEq(address(bridge).balance, 0);
-        assertEq(LUSD_TOKEN.balanceOf(address(bridge)), 0);
+        assertEq(tokens["LUSD"].erc.balanceOf(address(bridge)), 0);
 
         // I want to check whether withdrawn amount of ETH is the same as the ROLLUP_PROCESSOR_WEI_BALANCE.
         // There is some imprecision so the amount is allowed to be different by 1 wei.
         uint256 diffInETH = OWNER.balance < OWNER_WEI_BALANCE
-        ? OWNER_WEI_BALANCE.sub(OWNER.balance)
-        : OWNER.balance.sub(OWNER_WEI_BALANCE);
+            ? OWNER_WEI_BALANCE.sub(OWNER.balance)
+            : OWNER.balance.sub(OWNER_WEI_BALANCE);
         assertLe(diffInETH, 1);
 
         // Check the TB total supply is 0

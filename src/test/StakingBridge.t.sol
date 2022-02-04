@@ -23,7 +23,7 @@ contract StakingBridgeTest is TestUtil {
 
     function testFullDepositWithdrawalFlow() public {
         // I will deposit and withdraw 1 million LQTY
-        uint256 depositAmount = 10**6 * WAD;
+        uint256 depositAmount = 1e24;
 
         // 1. Mint the deposit amount of LQTY to the bridge
         mint("LQTY", address(bridge), depositAmount);
@@ -69,7 +69,7 @@ contract StakingBridgeTest is TestUtil {
         assertEq(bridge.totalSupply(), 0);
 
         // 10. Check the LQTY balance of this contract is equal to the initial LQTY deposit
-        assertEq(IERC20(tokens["LQTY"].addr).balanceOf(address(this)), depositAmount);
+        assertEq(tokens["LQTY"].erc.balanceOf(address(this)), depositAmount);
     }
 
     function test10DepositsWithdrawals() public {
@@ -83,8 +83,8 @@ contract StakingBridgeTest is TestUtil {
             // 1. Mint deposit amount of LQTY to the bridge
             mint("LQTY", address(bridge), depositAmount);
             // 2. Mint rewards to the bridge
-            mint("LUSD", address(bridge), 100 * WAD);
-            mint("WETH", address(bridge), 1 * WAD);
+            mint("LUSD", address(bridge), 1e20);
+            mint("WETH", address(bridge), 1e18);
 
             // 3. Deposit LQTY to the staking contract through the bridge
             (uint256 outputValueA, , ) = bridge.convert(

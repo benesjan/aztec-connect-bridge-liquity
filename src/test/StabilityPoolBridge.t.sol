@@ -26,7 +26,7 @@ contract StabilityPoolBridgeTest is TestUtil {
 
     function testFullDepositWithdrawalFlow() public {
         // I will deposit and withdraw 1 million LUSD
-        uint256 depositAmount = 10**6 * WAD;
+        uint256 depositAmount = 1e24;
 
         // 1. Mint the deposit amount of LUSD to the bridge
         mint("LUSD", address(bridge), depositAmount);
@@ -73,7 +73,7 @@ contract StabilityPoolBridgeTest is TestUtil {
         assertEq(bridge.totalSupply(), 0);
 
         // 10. Check the LUSD balance of this contract is equal to the initial LUSD deposit
-        assertEq(IERC20(tokens["LUSD"].addr).balanceOf(address(this)), depositAmount);
+        assertEq(tokens["LUSD"].erc.balanceOf(address(this)), depositAmount);
     }
 
     function test10DepositsWithdrawals() public {
@@ -87,8 +87,8 @@ contract StabilityPoolBridgeTest is TestUtil {
             // 1. Mint deposit amount of LUSD to the bridge
             mint("LUSD", address(bridge), depositAmount);
             // 2. Mint rewards to the bridge
-            mint("LQTY", address(bridge), 100 * WAD);
-            mint("WETH", address(bridge), 1 * WAD);
+            mint("LQTY", address(bridge), 1e20);
+            mint("WETH", address(bridge), 1e18);
 
             // 3. Deposit LUSD to StabilityPool through the bridge
             (uint256 outputValueA, , ) = bridge.convert(
