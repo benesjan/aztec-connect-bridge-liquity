@@ -115,7 +115,8 @@ contract TroveBridgeTest is TestUtil {
         bridge.troveManager().redeemCollateral(amountToRedeem, address(0), address(0), address(0), 0, 0, 5e16);
         Status troveStatus = Status(bridge.troveManager().getTroveStatus(address(bridge)));
         assertTrue(troveStatus == Status.closedByRedemption);
-        // TODO
+
+        _redeem();
     }
 
     function _openTrove() private {
@@ -268,6 +269,52 @@ contract TroveBridgeTest is TestUtil {
         ? OWNER_WEI_BALANCE.sub(OWNER.balance)
         : OWNER.balance.sub(OWNER_WEI_BALANCE);
         assertLe(diffInETH, 1);
+
+        // Check the TB total supply is 0
+        assertEq(bridge.totalSupply(), 0);
+
+        hevm.stopPrank();
+    }
+
+    function _redeem() private {
+        // Set msg.sender to ROLLUP_PROCESSOR
+        hevm.startPrank(rollupProcessor);
+
+        uint256 processorTBBalance = bridge.balanceOf(rollupProcessor);
+
+        // Transfer TB to the bridge before redeeming
+        require(bridge.transfer(address(bridge), processorTBBalance), "TroveBridgeTest: TB_TRANSFER_FAILED");
+
+        bridge.convert(
+            Types.AztecAsset(2, address(bridge), Types.AztecAssetType.ERC20),
+            Types.AztecAsset(0, address(0), Types.AztecAssetType.NOT_USED),
+            Types.AztecAsset(3, address(0), Types.AztecAssetType.ETH),
+            Types.AztecAsset(0, address(0), Types.AztecAssetType.NOT_USED),
+            processorTBBalance,
+            0,
+            0
+        );
+
+        // Check that non-zero amount of ETH has been redeemed
+        assertGt(rollupProcessor.balance, 0);
+
+        hevm.stopPrank();
+    }
+
+    function _closeRedeem() private {
+        // Set msg.sender to OWNER
+        hevm.startPrank(OWNER);
+
+        bridge.closeTrove();
+
+        // Check the bridge doesn't hold any ETH or LUSD
+        assertEq(address(bridge).balance, 0);
+
+        // Check that non-zero amount of ETH has been redeemed
+        assertGt(OWNER.balance, 0);
+
+        // Check the TB total supply is 0
+        assertEq(bridge.totalSupply(), 0);
 
         hevm.stopPrank();
     }
