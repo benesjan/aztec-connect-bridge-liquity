@@ -6,7 +6,7 @@ pragma abicoder v2;
 import "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import "../lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 
-import "./Types.sol";
+import "./AztecTypes.sol";
 import "./interfaces/IWETH.sol";
 import "./interfaces/IDefiBridge.sol";
 import "./interfaces/ISwapRouter.sol";
@@ -39,14 +39,14 @@ contract StakingBridge is IDefiBridge, ERC20("StakingBridge", "SB") {
     ILQTYStaking public constant STAKING_CONTRACT = ILQTYStaking(0x4f9Fbb3f1E99B56e0Fe2892e623Ed36A76Fc605d);
     ISwapRouter public constant UNI_ROUTER = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
 
-    address public immutable rollupProcessor;
+    address public immutable processor;
 
     /**
      * @notice Set the addresses of RollupProcessor.sol and token approvals.
-     * @param _rollupProcessor Address of the RollupProcessor.sol
+     * @param _processor Address of the RollupProcessor.sol
      */
-    constructor(address _rollupProcessor) {
-        rollupProcessor = _rollupProcessor;
+    constructor(address _processor) {
+        processor = _processor;
 
         // Note: StakingBridge never holds LUSD, LQTY, USDC or WETH after or before an invocation of any of its
         // functions. For this reason the following is not a security risk and makes the convert() function more gas
@@ -74,10 +74,10 @@ contract StakingBridge is IDefiBridge, ERC20("StakingBridge", "SB") {
      * the RollupProcessor.sol
      */
     function convert(
-        Types.AztecAsset calldata inputAssetA,
-        Types.AztecAsset calldata,
-        Types.AztecAsset calldata outputAssetA,
-        Types.AztecAsset calldata,
+        AztecTypes.AztecAsset calldata inputAssetA,
+        AztecTypes.AztecAsset calldata,
+        AztecTypes.AztecAsset calldata outputAssetA,
+        AztecTypes.AztecAsset calldata,
         uint256 inputValue,
         uint256,
         uint64
@@ -91,7 +91,7 @@ contract StakingBridge is IDefiBridge, ERC20("StakingBridge", "SB") {
             bool isAsync
         )
     {
-        require(msg.sender == rollupProcessor, "StakingBridge: INVALID_CALLER");
+        require(msg.sender == processor, "StakingBridge: INVALID_CALLER");
         isAsync = false;
 
         if (inputAssetA.erc20Address == LQTY) {
@@ -110,7 +110,7 @@ contract StakingBridge is IDefiBridge, ERC20("StakingBridge", "SB") {
                 // When I multiply this ^ with the amount of LQTY deposited I get the amount of SB to be minted.
                 outputValueA = (this.totalSupply() * inputValue) / totalLQTYOwnedBeforeDeposit;
             }
-            _mint(rollupProcessor, outputValueA);
+            _mint(processor, outputValueA);
         } else {
             // Withdrawal
             require(
@@ -126,7 +126,7 @@ contract StakingBridge is IDefiBridge, ERC20("StakingBridge", "SB") {
             outputValueA = (STAKING_CONTRACT.stakes(address(this)) * inputValue) / this.totalSupply();
             STAKING_CONTRACT.unstake(outputValueA);
             _burn(address(this), inputValue);
-            require(IERC20(LQTY).transfer(rollupProcessor, outputValueA), "StakingBridge: WITHDRAWAL_TRANSFER_FAILED");
+            require(IERC20(LQTY).transfer(processor, outputValueA), "StakingBridge: WITHDRAWAL_TRANSFER_FAILED");
         }
     }
 
@@ -165,22 +165,24 @@ contract StakingBridge is IDefiBridge, ERC20("StakingBridge", "SB") {
         }
     }
 
-    // @return Always false because this contract does not implement async flow.
-    function canFinalise(
-        uint256 /*interactionNonce*/
-    ) external view override returns (bool) {
-        return false;
-    }
-
     // @notice This function always reverts because this contract does not implement async flow.
     function finalise(
-        Types.AztecAsset calldata,
-        Types.AztecAsset calldata,
-        Types.AztecAsset calldata,
-        Types.AztecAsset calldata,
+        AztecTypes.AztecAsset calldata,
+        AztecTypes.AztecAsset calldata,
+        AztecTypes.AztecAsset calldata,
+        AztecTypes.AztecAsset calldata,
         uint256,
         uint64
-    ) external payable override returns (uint256, uint256) {
+    )
+        external
+        payable
+        override
+        returns (
+            uint256,
+            uint256,
+            bool
+        )
+    {
         require(false, "StakingBridge: ASYNC_MODE_DISABLED");
     }
 

@@ -4,11 +4,12 @@ pragma solidity >=0.8.0 <=0.8.10;
 pragma abicoder v2;
 
 import "../StakingBridge.sol";
-import "../Types.sol";
+import "../AztecTypes.sol";
 import "./TestUtil.sol";
 
 contract StakingBridgeTestInternal is TestUtil, StakingBridge(address(0)) {
     function setUp() public {
+        _aztecPreSetup();
         setUpTokens();
     }
 

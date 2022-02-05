@@ -4,14 +4,13 @@ pragma solidity >=0.8.0 <=0.8.10;
 pragma abicoder v2;
 
 import "../TroveBridge.sol";
-import "../Types.sol";
+import "../AztecTypes.sol";
 import "../interfaces/ISortedTroves.sol";
 import "./TestUtil.sol";
 import "./interfaces/IHintHelpers.sol";
 import "./mocks/MockRollupProcessor.sol";
 
 contract TroveBridgeTest is TestUtil {
-    address private rollupProcessor;
     TroveBridge private bridge;
 
     IHintHelpers private constant hintHelpers = IHintHelpers(0xE84251b93D9524E0d2e621Ba7dc7cb3579F997C0);
@@ -34,18 +33,18 @@ contract TroveBridgeTest is TestUtil {
     }
 
     function setUp() public {
+        _aztecPreSetup();
         setUpTokens();
+
         uint256 initialCollateralRatio = 160;
         uint256 maxFee = 5e16; // Slippage protection: 5%
 
-        rollupProcessor = address(new MockRollupProcessor());
-
         hevm.prank(OWNER);
-        bridge = new TroveBridge(rollupProcessor, initialCollateralRatio, maxFee);
+        bridge = new TroveBridge(address(rollupProcessor), initialCollateralRatio, maxFee);
 
         // Set OWNER's and ROLLUP_PROCESSOR's balances
         hevm.deal(OWNER, OWNER_WEI_BALANCE);
-        hevm.deal(rollupProcessor, ROLLUP_PROCESSOR_WEI_BALANCE);
+        hevm.deal(address(rollupProcessor), ROLLUP_PROCESSOR_WEI_BALANCE);
     }
 
     function testInitialERC20Params() public {
@@ -55,15 +54,13 @@ contract TroveBridgeTest is TestUtil {
     }
 
     function testFailIncorrectTroveState() public {
-        // Set msg.sender to ROLLUP_PROCESSOR
-        hevm.prank(rollupProcessor);
-
         // Borrow when trove was not opened - state 0
-        bridge.convert(
-            Types.AztecAsset(3, address(0), Types.AztecAssetType.ETH),
-            Types.AztecAsset(0, address(0), Types.AztecAssetType.NOT_USED),
-            Types.AztecAsset(2, address(bridge), Types.AztecAssetType.ERC20),
-            Types.AztecAsset(1, tokens["LUSD"].addr, Types.AztecAssetType.ERC20),
+        rollupProcessor.convert(
+            address(bridge),
+            AztecTypes.AztecAsset(3, address(0), AztecTypes.AztecAssetType.ETH),
+            AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
+            AztecTypes.AztecAsset(2, address(bridge), AztecTypes.AztecAssetType.ERC20),
+            AztecTypes.AztecAsset(1, tokens["LUSD"].addr, AztecTypes.AztecAssetType.ERC20),
             ROLLUP_PROCESSOR_WEI_BALANCE,
             0,
             0
@@ -71,15 +68,13 @@ contract TroveBridgeTest is TestUtil {
     }
 
     function testFailIncorrectInput() public {
-        // Set msg.sender to ROLLUP_PROCESSOR
-        hevm.prank(rollupProcessor);
-
         // Borrow when trove was not opened - state 0
-        bridge.convert(
-            Types.AztecAsset(0, address(0), Types.AztecAssetType.NOT_USED),
-            Types.AztecAsset(0, address(0), Types.AztecAssetType.NOT_USED),
-            Types.AztecAsset(0, address(0), Types.AztecAssetType.NOT_USED),
-            Types.AztecAsset(0, address(0), Types.AztecAssetType.NOT_USED),
+        rollupProcessor.convert(
+            address(bridge),
+            AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
+            AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
+            AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
+            AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
             0,
             0,
             0
@@ -169,9 +164,6 @@ contract TroveBridgeTest is TestUtil {
     }
 
     function _borrow() private {
-        // Set msg.sender to ROLLUP_PROCESSOR
-        hevm.startPrank(rollupProcessor);
-
         // Send ROLLUP_PROCESSOR_WEI_BALANCE to the bridge contract
         require(payable(address(bridge)).send(ROLLUP_PROCESSOR_WEI_BALANCE), "TroveBridgeTest: ETH_TRANSFER_FAILED");
 
@@ -181,11 +173,12 @@ contract TroveBridgeTest is TestUtil {
         (, uint256 collBeforeBorrowing, , ) = bridge.troveManager().getEntireDebtAndColl(address(bridge));
 
         // Borrow against ROLLUP_PROCESSOR_WEI_BALANCE
-        bridge.convert(
-            Types.AztecAsset(3, address(0), Types.AztecAssetType.ETH),
-            Types.AztecAsset(0, address(0), Types.AztecAssetType.NOT_USED),
-            Types.AztecAsset(2, address(bridge), Types.AztecAssetType.ERC20),
-            Types.AztecAsset(1, tokens["LUSD"].addr, Types.AztecAssetType.ERC20),
+        rollupProcessor.convert(
+            address(bridge),
+            AztecTypes.AztecAsset(3, address(0), AztecTypes.AztecAssetType.ETH),
+            AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
+            AztecTypes.AztecAsset(2, address(bridge), AztecTypes.AztecAssetType.ERC20),
+            AztecTypes.AztecAsset(1, tokens["LUSD"].addr, AztecTypes.AztecAssetType.ERC20),
             ROLLUP_PROCESSOR_WEI_BALANCE,
             0,
             0
@@ -207,20 +200,18 @@ contract TroveBridgeTest is TestUtil {
         // Check the bridge doesn't hold any ETH or LUSD
         assertEq(address(bridge).balance, 0);
         assertEq(tokens["LUSD"].erc.balanceOf(address(bridge)), 0);
-
-        hevm.stopPrank();
     }
 
     function _repay() private {
         // Set msg.sender to ROLLUP_PROCESSOR
-        hevm.startPrank(rollupProcessor);
+        hevm.startPrank(address(rollupProcessor));
 
-        uint256 processorTBBalance = bridge.balanceOf(rollupProcessor);
-        uint256 processorLUSDBalance = tokens["LUSD"].erc.balanceOf(rollupProcessor);
+        uint256 processorTBBalance = bridge.balanceOf(address(rollupProcessor));
+        uint256 processorLUSDBalance = tokens["LUSD"].erc.balanceOf(address(rollupProcessor));
 
         uint256 borrowerFee = processorTBBalance - processorLUSDBalance;
         // Mint the borrower fee to ROLLUP_PROCESSOR in order to have a big enough balance for repaying
-        mint("LUSD", rollupProcessor, borrowerFee);
+        mint("LUSD", address(rollupProcessor), borrowerFee);
 
         // Transfer TB and LUSD to the bridge before repaying
         require(bridge.transfer(address(bridge), processorTBBalance), "TroveBridgeTest: TB_TRANSFER_FAILED");
@@ -230,10 +221,10 @@ contract TroveBridgeTest is TestUtil {
         );
 
         bridge.convert(
-            Types.AztecAsset(2, address(bridge), Types.AztecAssetType.ERC20),
-            Types.AztecAsset(1, tokens["LUSD"].addr, Types.AztecAssetType.ERC20),
-            Types.AztecAsset(3, address(0), Types.AztecAssetType.ETH),
-            Types.AztecAsset(0, address(0), Types.AztecAssetType.NOT_USED),
+            AztecTypes.AztecAsset(2, address(bridge), AztecTypes.AztecAssetType.ERC20),
+            AztecTypes.AztecAsset(1, tokens["LUSD"].addr, AztecTypes.AztecAssetType.ERC20),
+            AztecTypes.AztecAsset(3, address(0), AztecTypes.AztecAssetType.ETH),
+            AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
             processorTBBalance,
             0,
             0
@@ -245,9 +236,9 @@ contract TroveBridgeTest is TestUtil {
 
         // I want to check whether withdrawn amount of ETH is the same as the ROLLUP_PROCESSOR_WEI_BALANCE.
         // There is some imprecision so the amount is allowed to be different by 1 wei.
-        uint256 diffInETH = rollupProcessor.balance < ROLLUP_PROCESSOR_WEI_BALANCE
-            ? ROLLUP_PROCESSOR_WEI_BALANCE - rollupProcessor.balance
-            : rollupProcessor.balance - ROLLUP_PROCESSOR_WEI_BALANCE;
+        uint256 diffInETH = address(rollupProcessor).balance < ROLLUP_PROCESSOR_WEI_BALANCE
+            ? ROLLUP_PROCESSOR_WEI_BALANCE - address(rollupProcessor).balance
+            : address(rollupProcessor).balance - ROLLUP_PROCESSOR_WEI_BALANCE;
         assertLe(diffInETH, 1);
 
         hevm.stopPrank();
@@ -290,25 +281,25 @@ contract TroveBridgeTest is TestUtil {
 
     function _redeem() private {
         // Set msg.sender to ROLLUP_PROCESSOR
-        hevm.startPrank(rollupProcessor);
+        hevm.startPrank(address(rollupProcessor));
 
-        uint256 processorTBBalance = bridge.balanceOf(rollupProcessor);
+        uint256 processorTBBalance = bridge.balanceOf(address(rollupProcessor));
 
         // Transfer TB to the bridge before redeeming
         require(bridge.transfer(address(bridge), processorTBBalance), "TroveBridgeTest: TB_TRANSFER_FAILED");
 
         bridge.convert(
-            Types.AztecAsset(2, address(bridge), Types.AztecAssetType.ERC20),
-            Types.AztecAsset(0, address(0), Types.AztecAssetType.NOT_USED),
-            Types.AztecAsset(3, address(0), Types.AztecAssetType.ETH),
-            Types.AztecAsset(0, address(0), Types.AztecAssetType.NOT_USED),
+            AztecTypes.AztecAsset(2, address(bridge), AztecTypes.AztecAssetType.ERC20),
+            AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
+            AztecTypes.AztecAsset(3, address(0), AztecTypes.AztecAssetType.ETH),
+            AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
             processorTBBalance,
             0,
             0
         );
 
         // Check that non-zero amount of ETH has been redeemed
-        assertGt(rollupProcessor.balance, 0);
+        assertGt(address(rollupProcessor).balance, 0);
 
         hevm.stopPrank();
     }

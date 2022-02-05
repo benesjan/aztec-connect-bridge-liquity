@@ -6,7 +6,7 @@ pragma abicoder v2;
 import "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import "../lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 
-import "./Types.sol";
+import "./AztecTypes.sol";
 import "./interfaces/IWETH.sol";
 import "./interfaces/IDefiBridge.sol";
 import "./interfaces/ISwapRouter.sol";
@@ -41,18 +41,18 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
     IStabilityPool public constant STABILITY_POOL = IStabilityPool(0x66017D22b0f8556afDd19FC67041899Eb65a21bb);
     ISwapRouter public constant UNI_ROUTER = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
 
-    address public immutable rollupProcessor;
+    address public immutable processor;
     address public immutable frontEndTag; // see StabilityPool.sol for details
 
     /**
      * @notice Set addresses and token approvals.
-     * @param _rollupProcessor Address of the RollupProcessor.sol
+     * @param _processor Address of the RollupProcessor.sol
      * @param _frontEndTag An address/tag identifying to which frontend LQTY frontend rewards should go. Can be zero.
      * @dev Frontend tag is set here because there can be only 1 frontend tag per msg.sender in the StabilityPool.sol.
      * See https://docs.liquity.org/faq/frontend-operators#how-do-frontend-tags-work[Liquity docs] for more details.
      */
-    constructor(address _rollupProcessor, address _frontEndTag) {
-        rollupProcessor = _rollupProcessor;
+    constructor(address _processor, address _frontEndTag) {
+        processor = _processor;
         frontEndTag = _frontEndTag;
 
         // Note: StabilityPoolBridge never holds LUSD, LQTY, USDC or WETH after or before an invocation of any of its
@@ -94,10 +94,10 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
      * the RollupProcessor.sol
      */
     function convert(
-        Types.AztecAsset calldata inputAssetA,
-        Types.AztecAsset calldata,
-        Types.AztecAsset calldata outputAssetA,
-        Types.AztecAsset calldata,
+        AztecTypes.AztecAsset calldata inputAssetA,
+        AztecTypes.AztecAsset calldata,
+        AztecTypes.AztecAsset calldata outputAssetA,
+        AztecTypes.AztecAsset calldata,
         uint256 inputValue,
         uint256,
         uint64
@@ -111,7 +111,7 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
             bool isAsync
         )
     {
-        require(msg.sender == rollupProcessor, "StabilityPoolBridge: INVALID_CALLER");
+        require(msg.sender == processor, "StabilityPoolBridge: INVALID_CALLER");
         isAsync = false;
 
         if (inputAssetA.erc20Address == LUSD) {
@@ -130,7 +130,7 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
                 // When I multiply this ^ with the amount of LUSD deposited I get the amount of SPB to be minted.
                 outputValueA = (this.totalSupply() * inputValue) / totalLUSDOwnedBeforeDeposit;
             }
-            _mint(rollupProcessor, outputValueA);
+            _mint(processor, outputValueA);
         } else {
             // Withdrawal
             require(
@@ -146,10 +146,7 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
             outputValueA = (STABILITY_POOL.getCompoundedLUSDDeposit(address(this)) * inputValue) / this.totalSupply();
             STABILITY_POOL.withdrawFromSP(outputValueA);
             _burn(address(this), inputValue);
-            require(
-                IERC20(LUSD).transfer(rollupProcessor, outputValueA),
-                "StabilityPoolBridge: WITHDRAWAL_TRANSFER_FAILED"
-            );
+            require(IERC20(LUSD).transfer(processor, outputValueA), "StabilityPoolBridge: WITHDRAWAL_TRANSFER_FAILED");
         }
     }
 
@@ -188,22 +185,24 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
         }
     }
 
-    // @return Always false because this contract does not implement async flow.
-    function canFinalise(
-        uint256 /*interactionNonce*/
-    ) external view override returns (bool) {
-        return false;
-    }
-
     // @notice This function always reverts because this contract does not implement async flow.
     function finalise(
-        Types.AztecAsset calldata,
-        Types.AztecAsset calldata,
-        Types.AztecAsset calldata,
-        Types.AztecAsset calldata,
+        AztecTypes.AztecAsset calldata,
+        AztecTypes.AztecAsset calldata,
+        AztecTypes.AztecAsset calldata,
+        AztecTypes.AztecAsset calldata,
         uint256,
         uint64
-    ) external payable override returns (uint256, uint256) {
+    )
+        external
+        payable
+        override
+        returns (
+            uint256,
+            uint256,
+            bool
+        )
+    {
         require(false, "StabilityPoolBridge: ASYNC_MODE_DISABLED");
     }
 }

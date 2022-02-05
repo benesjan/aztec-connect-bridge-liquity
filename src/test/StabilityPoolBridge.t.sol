@@ -4,13 +4,14 @@ pragma solidity >=0.8.0 <=0.8.10;
 pragma abicoder v2;
 
 import "../StabilityPoolBridge.sol";
-import "../Types.sol";
+import "../AztecTypes.sol";
 import "./TestUtil.sol";
 
 contract StabilityPoolBridgeTest is TestUtil {
     StabilityPoolBridge private bridge;
 
     function setUp() public {
+        _aztecPreSetup();
         setUpTokens();
 
         address rollupProcessor = address(this);
@@ -34,10 +35,10 @@ contract StabilityPoolBridgeTest is TestUtil {
 
         // 2. Deposit LUSD to the StabilityPool contract through the bridge
         bridge.convert(
-            Types.AztecAsset(1, tokens["LUSD"].addr, Types.AztecAssetType.ERC20),
-            Types.AztecAsset(0, address(0), Types.AztecAssetType.NOT_USED),
-            Types.AztecAsset(2, address(bridge), Types.AztecAssetType.ERC20),
-            Types.AztecAsset(0, address(0), Types.AztecAssetType.NOT_USED),
+            AztecTypes.AztecAsset(1, tokens["LUSD"].addr, AztecTypes.AztecAssetType.ERC20),
+            AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
+            AztecTypes.AztecAsset(2, address(bridge), AztecTypes.AztecAssetType.ERC20),
+            AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
             depositAmount,
             0,
             0
@@ -61,10 +62,10 @@ contract StabilityPoolBridgeTest is TestUtil {
 
         // 8. Withdraw LUSD from StabilityPool through the bridge
         bridge.convert(
-            Types.AztecAsset(2, address(bridge), Types.AztecAssetType.ERC20),
-            Types.AztecAsset(0, address(0), Types.AztecAssetType.NOT_USED),
-            Types.AztecAsset(1, tokens["LUSD"].addr, Types.AztecAssetType.ERC20),
-            Types.AztecAsset(0, address(0), Types.AztecAssetType.NOT_USED),
+            AztecTypes.AztecAsset(2, address(bridge), AztecTypes.AztecAssetType.ERC20),
+            AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
+            AztecTypes.AztecAsset(1, tokens["LUSD"].addr, AztecTypes.AztecAssetType.ERC20),
+            AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
             withdrawAmount,
             0,
             0
@@ -93,10 +94,10 @@ contract StabilityPoolBridgeTest is TestUtil {
 
             // 3. Deposit LUSD to StabilityPool through the bridge
             (uint256 outputValueA, , ) = bridge.convert(
-                Types.AztecAsset(1, tokens["LUSD"].addr, Types.AztecAssetType.ERC20),
-                Types.AztecAsset(0, address(0), Types.AztecAssetType.NOT_USED),
-                Types.AztecAsset(2, address(bridge), Types.AztecAssetType.ERC20),
-                Types.AztecAsset(0, address(0), Types.AztecAssetType.NOT_USED),
+                AztecTypes.AztecAsset(1, tokens["LUSD"].addr, AztecTypes.AztecAssetType.ERC20),
+                AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
+                AztecTypes.AztecAsset(2, address(bridge), AztecTypes.AztecAssetType.ERC20),
+                AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
                 depositAmount,
                 0,
                 0
@@ -117,10 +118,10 @@ contract StabilityPoolBridgeTest is TestUtil {
 
             // 5. Withdraw LUSD from StabilityPool through the bridge
             bridge.convert(
-                Types.AztecAsset(2, address(bridge), Types.AztecAssetType.ERC20),
-                Types.AztecAsset(0, address(0), Types.AztecAssetType.NOT_USED),
-                Types.AztecAsset(1, tokens["LUSD"].addr, Types.AztecAssetType.ERC20),
-                Types.AztecAsset(0, address(0), Types.AztecAssetType.NOT_USED),
+                AztecTypes.AztecAsset(2, address(bridge), AztecTypes.AztecAssetType.ERC20),
+                AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
+                AztecTypes.AztecAsset(1, tokens["LUSD"].addr, AztecTypes.AztecAssetType.ERC20),
+                AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
                 withdrawAmount,
                 0,
                 0

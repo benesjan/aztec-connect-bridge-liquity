@@ -8,7 +8,7 @@ import "../lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import "../lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import "../lib/openzeppelin-contracts/contracts/utils/Strings.sol";
 
-import "./Types.sol";
+import "./AztecTypes.sol";
 import "./interfaces/IDefiBridge.sol";
 import "./interfaces/IBorrowerOperations.sol";
 import "./interfaces/ITroveManager.sol";
@@ -67,6 +67,9 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
         rollupProcessor = _rollupProcessor;
         initialICR = _initialICRPerc * 1e16;
         maxFee = _maxFee;
+
+        require(IERC20(LUSD).approve(address(_rollupProcessor), type(uint256).max), "TroveBridge: LUSD_APPROVE_FAILED");
+        require(this.approve(address(_rollupProcessor), type(uint256).max), "TroveBridge: TB_APPROVE_FAILED");
     }
 
     /**
@@ -108,10 +111,10 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
      * @return outputValueB -       amount of LUSD          0                       0
      */
     function convert(
-        Types.AztecAsset calldata inputAssetA,
-        Types.AztecAsset calldata inputAssetB,
-        Types.AztecAsset calldata outputAssetA,
-        Types.AztecAsset calldata outputAssetB,
+        AztecTypes.AztecAsset calldata inputAssetA,
+        AztecTypes.AztecAsset calldata inputAssetB,
+        AztecTypes.AztecAsset calldata outputAssetA,
+        AztecTypes.AztecAsset calldata outputAssetB,
         uint256 inputValue,
         uint256 interactionNonce,
         uint64
@@ -133,7 +136,7 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
         address lowerHint = sortedTroves.getNext(address(this));
 
         if (
-            inputAssetA.assetType == Types.AztecAssetType.ETH &&
+            inputAssetA.assetType == AztecTypes.AztecAssetType.ETH &&
             outputAssetA.erc20Address == address(this) &&
             outputAssetB.erc20Address == LUSD
         ) {
@@ -148,13 +151,11 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
 
             // outputValueA = debt increase = amount of TB to mint
             outputValueA = debtAfter - debtBefore;
-            _mint(rollupProcessor, outputValueA);
-
-            require(IERC20(LUSD).transfer(rollupProcessor, outputValueB), "TroveBridge: LUSD_TRANSFER_FAILED");
+            _mint(address(this), outputValueA);
         } else if (
             inputAssetA.erc20Address == address(this) &&
             inputAssetB.erc20Address == LUSD &&
-            outputAssetA.assetType == Types.AztecAssetType.ETH
+            outputAssetA.assetType == AztecTypes.AztecAssetType.ETH
         ) {
             // Repaying
             require(troveStatus == Status.active, "TroveBridge: INACTIVE_TROVE");
@@ -163,7 +164,9 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
             operations.adjustTrove(maxFee, outputValueA, inputValue, false, upperHint, lowerHint);
             _burn(address(this), inputValue);
             IRollupProcessor(rollupProcessor).receiveEthFromBridge{value: outputValueA}(interactionNonce);
-        } else if (inputAssetA.erc20Address == address(this) && outputAssetA.assetType == Types.AztecAssetType.ETH) {
+        } else if (
+            inputAssetA.erc20Address == address(this) && outputAssetA.assetType == AztecTypes.AztecAssetType.ETH
+        ) {
             // Redeeming
             require(troveStatus == Status.closedByRedemption, "TroveBridge: INCORRECT_STATUS");
             if (!_collateralClaimed) {
@@ -264,22 +267,24 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
         }
     }
 
-    // @return Always false because this contract does not implement async flow.
-    function canFinalise(
-        uint256 /*interactionNonce*/
-    ) external view override returns (bool) {
-        return false;
-    }
-
     // @notice This function always reverts because this contract does not implement async flow.
     function finalise(
-        Types.AztecAsset calldata,
-        Types.AztecAsset calldata,
-        Types.AztecAsset calldata,
-        Types.AztecAsset calldata,
+        AztecTypes.AztecAsset calldata,
+        AztecTypes.AztecAsset calldata,
+        AztecTypes.AztecAsset calldata,
+        AztecTypes.AztecAsset calldata,
         uint256,
         uint64
-    ) external payable override returns (uint256, uint256) {
+    )
+        external
+        payable
+        override
+        returns (
+            uint256,
+            uint256,
+            bool
+        )
+    {
         require(false, "TroveBridge: ASYNC_MODE_DISABLED");
     }
 

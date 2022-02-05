@@ -3,7 +3,7 @@
 pragma solidity >=0.8.0 <=0.8.10;
 pragma abicoder v2;
 
-library Types {
+library AztecTypes {
     enum AztecAssetType {
         NOT_USED,
         ETH,

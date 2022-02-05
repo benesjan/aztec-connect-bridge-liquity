@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-only
 // Copyright 2020 Spilsbury Holdings Ltd
-pragma solidity >=0.8.0 <=0.8.10;
-pragma abicoder v2;
+pragma solidity >=0.6.6 <0.8.11;
+pragma experimental ABIEncoderV2;
 
-import {Types} from "../Types.sol";
+import "../AztecTypes.sol";
 
 interface IDefiBridge {
     /**
@@ -45,26 +45,21 @@ interface IDefiBridge {
     // @return uint256 outputValueB the amount of outputAssetB returned from this interaction, should be 0 if async or bridge only returns 1 asset.
     // @return bool isAsync a flag to toggle if this bridge interaction will return assets at a later date after some third party contract has interacted with it via finalise()
     function convert(
-        Types.AztecAsset calldata inputAssetA,
-        Types.AztecAsset calldata inputAssetB,
-        Types.AztecAsset calldata outputAssetA,
-        Types.AztecAsset calldata outputAssetB,
+        AztecTypes.AztecAsset calldata inputAssetA,
+        AztecTypes.AztecAsset calldata inputAssetB,
+        AztecTypes.AztecAsset calldata outputAssetA,
+        AztecTypes.AztecAsset calldata outputAssetB,
         uint256 inputValue,
         uint256 interactionNonce,
         uint64 auxData
     )
-        external
-        payable
-        returns (
-            uint256 outputValueA,
-            uint256 outputValueB,
-            bool isAsync
-        );
-
-    // @dev This function is called from the RollupProcessor.sol contract via the DefiBridgeProxy
-    // @param uint256 interactionNonce
-
-    function canFinalise(uint256 interactionNonce) external view returns (bool);
+    external
+    payable
+    returns (
+        uint256 outputValueA,
+        uint256 outputValueB,
+        bool isAsync
+    );
 
     // @dev This function is called from the RollupProcessor.sol contract via the DefiBridgeProxy. It receives the aggreagte sum of all users funds for the input assets.
     // @param AztecAsset inputAssetA a struct detailing the first input asset, this will always be set
@@ -77,11 +72,13 @@ interface IDefiBridge {
     // @return uint256 outputValueB optional return value of output asset B
     // @dev this function should have a modifier on it to ensure it can only be called by the Rollup Contract
     function finalise(
-        Types.AztecAsset calldata inputAssetA,
-        Types.AztecAsset calldata inputAssetB,
-        Types.AztecAsset calldata outputAssetA,
-        Types.AztecAsset calldata outputAssetB,
+        AztecTypes.AztecAsset calldata inputAssetA,
+        AztecTypes.AztecAsset calldata inputAssetB,
+        AztecTypes.AztecAsset calldata outputAssetA,
+        AztecTypes.AztecAsset calldata outputAssetB,
         uint256 interactionNonce,
         uint64 auxData
-    ) external payable returns (uint256 outputValueA, uint256 outputValueB);
+    ) external payable returns (uint256 outputValueA, uint256 outputValueB, bool interactionComplete);
+
+
 }

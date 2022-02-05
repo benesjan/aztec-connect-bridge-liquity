@@ -8,6 +8,7 @@ pragma abicoder v2;
 import "../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import "../../lib/ds-test/src/test.sol";
 import "./mocks/MockPriceFeed.sol";
+import "./mocks/MockRollupProcessor.sol";
 
 interface Hevm {
     function store(
@@ -29,6 +30,9 @@ interface Hevm {
 
 contract TestUtil is DSTest {
     Hevm internal hevm;
+
+    DefiBridgeProxy defiBridgeProxy;
+    MockRollupProcessor rollupProcessor;
 
     struct Token {
         address addr; // ERC20 Mainnet address
@@ -93,5 +97,10 @@ contract TestUtil is DSTest {
     function dropLiquityPriceByHalf() public {
         uint256 currentPrice = IPriceFeed(LIQUITY_PRICE_FEED_ADDR).fetchPrice();
         setLiquityPrice(currentPrice / 2);
+    }
+
+    function _aztecPreSetup() internal {
+        defiBridgeProxy = new DefiBridgeProxy();
+        rollupProcessor = new MockRollupProcessor(address(defiBridgeProxy));
     }
 }
