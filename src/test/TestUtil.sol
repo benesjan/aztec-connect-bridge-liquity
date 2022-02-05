@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-only
-pragma solidity 0.6.11;
+// Copyright 2020 Spilsbury Holdings Ltd
+pragma solidity >=0.8.0 <=0.8.10;
+pragma abicoder v2;
 
 // Inspired by https://github.com/maple-labs/maple-core/blob/main/contracts/test/TestUtil.sol
 
-import "../../lib/openzeppelin-contracts/contracts/math/SafeMath.sol";
 import "../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import "../../lib/ds-test/src/test.sol";
 import "./mocks/MockPriceFeed.sol";
@@ -27,8 +28,6 @@ interface Hevm {
 }
 
 contract TestUtil is DSTest {
-    using SafeMath for uint256;
-
     Hevm internal hevm;
 
     struct Token {
@@ -41,7 +40,7 @@ contract TestUtil is DSTest {
 
     mapping(bytes32 => Token) internal tokens;
 
-    constructor() public {
+    constructor() {
         hevm = Hevm(address(bytes20(uint160(uint256(keccak256("hevm cheat code"))))));
     }
 
@@ -93,7 +92,7 @@ contract TestUtil is DSTest {
 
     function dropLiquityPriceByHalf() public {
         uint256 currentPrice = IPriceFeed(LIQUITY_PRICE_FEED_ADDR).fetchPrice();
-        setLiquityPrice(currentPrice.div(2));
+        setLiquityPrice(currentPrice / 2);
     }
 
     /*

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-only
-pragma solidity 0.6.11;
-pragma experimental ABIEncoderV2;
+// Copyright 2020 Spilsbury Holdings Ltd
+pragma solidity >=0.8.0 <=0.8.10;
+pragma abicoder v2;
 
-import "../lib/openzeppelin-contracts/contracts/math/SafeMath.sol";
 import "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import "../lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import "../lib/openzeppelin-contracts/contracts/access/Ownable.sol";
@@ -30,7 +30,6 @@ import "./interfaces/IRollupProcessor.sol";
  * If the trove is closed by redemption, users can withdraw their remaining collateral by supplying their TB.
  */
 contract TroveBridge is IDefiBridge, ERC20, Ownable {
-    using SafeMath for uint256;
     using Strings for uint256;
 
     address public constant LUSD = 0x5f98805A4E8be255a32880FDeC7F6728C6568bA0;
@@ -64,7 +63,7 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
         address _rollupProcessor,
         uint256 _initialICRPerc,
         uint256 _maxFee
-    ) public ERC20("TroveBridge", string(abi.encodePacked("TB-", _initialICRPerc.toString()))) {
+    ) ERC20("TroveBridge", string(abi.encodePacked("TB-", _initialICRPerc.toString()))) {
         rollupProcessor = _rollupProcessor;
         initialICR = _initialICRPerc * 1e16;
         maxFee = _maxFee;
@@ -90,7 +89,7 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
 
         IERC20(LUSD).transfer(msg.sender, IERC20(LUSD).balanceOf(address(this)));
         // I mint TB token to msg.sender to be able to track collateral ownership. Minted amount equals debt increase.
-        _mint(msg.sender, debtAfter.sub(debtBefore));
+        _mint(msg.sender, debtAfter - debtBefore);
     }
 
     /**
@@ -148,7 +147,7 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
             (uint256 debtAfter, , , ) = troveManager.getEntireDebtAndColl(address(this));
 
             // outputValueA = debt increase = amount of TB to mint
-            outputValueA = debtAfter.sub(debtBefore);
+            outputValueA = debtAfter - debtBefore;
             _mint(rollupProcessor, outputValueA);
 
             require(IERC20(LUSD).transfer(rollupProcessor, outputValueB), "TroveBridge: LUSD_TRANSFER_FAILED");
@@ -160,7 +159,7 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
             // Repaying
             require(troveStatus == Status.active, "TroveBridge: INACTIVE_TROVE");
             (, uint256 coll, , ) = troveManager.getEntireDebtAndColl(address(this));
-            outputValueA = coll.mul(inputValue).div(this.totalSupply()); // Amount of collateral to withdraw
+            outputValueA = (coll * inputValue) / this.totalSupply(); // Amount of collateral to withdraw
             operations.adjustTrove(maxFee, outputValueA, inputValue, false, upperHint, lowerHint);
             _burn(address(this), inputValue);
             IRollupProcessor(rollupProcessor).receiveEthFromBridge{value: outputValueA}(interactionNonce);
@@ -171,7 +170,7 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
                 operations.claimCollateral();
                 _collateralClaimed = true;
             }
-            outputValueA = address(this).balance.mul(inputValue).div(this.totalSupply());
+            outputValueA = (address(this).balance * inputValue) / this.totalSupply();
             _burn(address(this), inputValue);
             IRollupProcessor(rollupProcessor).receiveEthFromBridge{value: outputValueA}(interactionNonce);
         } else {
@@ -207,7 +206,7 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
                 (uint256 remainingDebt, , , ) = troveManager.getEntireDebtAndColl(address(this));
                 // 200e18 is a part of debt which gets repaid from LUSD_GAS_COMPENSATION.
                 require(
-                    IERC20(LUSD).transferFrom(owner, address(this), remainingDebt.sub(200e18)),
+                    IERC20(LUSD).transferFrom(owner, address(this), remainingDebt - 200e18),
                     "TroveBridge: LUSD_TRANSFER_FAILED"
                 );
                 operations.closeTrove();
@@ -247,20 +246,20 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
         if (troveManager.getTroveStatus(address(this)) == 1) {
             // Trove is active - use current ICR and not the initial one
             uint256 icr = troveManager.getCurrentICR(address(this), price);
-            amtToBorrow = _coll.mul(price).div(icr);
+            amtToBorrow = (_coll * price) / icr;
             if (!isRecoveryMode) {
                 // Liquity is not in recovery mode so borrowing fee applies
                 uint256 borrowingRate = troveManager.getBorrowingRateWithDecay();
-                amtToBorrow = amtToBorrow.mul(1e18).div(borrowingRate.add(1e18));
+                amtToBorrow = (amtToBorrow * 1e18) / (borrowingRate + 1e18);
             }
         } else {
             // Trove is inactive - I will use initial ICR to compute debt
             // 200e18 - 200 LUSD gas compensation to liquidators
-            amtToBorrow = _coll.mul(price).div(initialICR).sub(200e18);
+            amtToBorrow = (_coll * price) / initialICR - 200e18;
             if (!isRecoveryMode) {
                 // Liquity is not in recovery mode so borrowing fee applies
                 uint256 borrowingRate = troveManager.getBorrowingRateWithDecay();
-                amtToBorrow = amtToBorrow.mul(1e18).div(borrowingRate.add(1e18));
+                amtToBorrow = (amtToBorrow * 1e18) / (borrowingRate + 1e18);
             }
         }
     }

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
-pragma solidity 0.6.11;
-pragma experimental ABIEncoderV2;
+// Copyright 2020 Spilsbury Holdings Ltd
+pragma solidity >=0.8.0 <=0.8.10;
+pragma abicoder v2;
 
 import "../TroveBridge.sol";
 import "../Types.sol";
@@ -133,7 +134,7 @@ contract TroveBridgeTest is TestUtil {
         hevm.startPrank(OWNER);
 
         uint256 amtToBorrow = bridge.computeAmtToBorrow(OWNER_WEI_BALANCE);
-        uint256 nicr = OWNER_WEI_BALANCE.mul(NICR_PRECISION).div(amtToBorrow);
+        uint256 nicr = (OWNER_WEI_BALANCE * NICR_PRECISION) / amtToBorrow;
 
         // The following is Solidity implementation of https://github.com/liquity/dev#opening-a-trove
         uint256 numTrials = 15;
@@ -172,7 +173,7 @@ contract TroveBridgeTest is TestUtil {
         hevm.startPrank(rollupProcessor);
 
         // Send ROLLUP_PROCESSOR_WEI_BALANCE to the bridge contract
-        require(address(bridge).send(ROLLUP_PROCESSOR_WEI_BALANCE), "TroveBridgeTest: ETH_TRANSFER_FAILED");
+        require(payable(address(bridge)).send(ROLLUP_PROCESSOR_WEI_BALANCE), "TroveBridgeTest: ETH_TRANSFER_FAILED");
 
         uint256 price = bridge.troveManager().priceFeed().fetchPrice();
         uint256 icrBeforeBorrowing = bridge.troveManager().getCurrentICR(address(bridge), price);
@@ -194,7 +195,7 @@ contract TroveBridgeTest is TestUtil {
             address(bridge)
         );
         // Check the collateral increase equals ROLLUP_PROCESSOR_WEI_BALANCE
-        assertEq(collAfterBorrowing.sub(collBeforeBorrowing), ROLLUP_PROCESSOR_WEI_BALANCE);
+        assertEq(collAfterBorrowing - collBeforeBorrowing, ROLLUP_PROCESSOR_WEI_BALANCE);
 
         uint256 icrAfterBorrowing = bridge.troveManager().getCurrentICR(address(bridge), price);
         // Check the the ICR didn't change
@@ -217,7 +218,7 @@ contract TroveBridgeTest is TestUtil {
         uint256 processorTBBalance = bridge.balanceOf(rollupProcessor);
         uint256 processorLUSDBalance = tokens["LUSD"].erc.balanceOf(rollupProcessor);
 
-        uint256 borrowerFee = processorTBBalance.sub(processorLUSDBalance);
+        uint256 borrowerFee = processorTBBalance - processorLUSDBalance;
         // Mint the borrower fee to ROLLUP_PROCESSOR in order to have a big enough balance for repaying
         mint("LUSD", rollupProcessor, borrowerFee);
 
@@ -245,8 +246,8 @@ contract TroveBridgeTest is TestUtil {
         // I want to check whether withdrawn amount of ETH is the same as the ROLLUP_PROCESSOR_WEI_BALANCE.
         // There is some imprecision so the amount is allowed to be different by 1 wei.
         uint256 diffInETH = rollupProcessor.balance < ROLLUP_PROCESSOR_WEI_BALANCE
-            ? ROLLUP_PROCESSOR_WEI_BALANCE.sub(rollupProcessor.balance)
-            : rollupProcessor.balance.sub(ROLLUP_PROCESSOR_WEI_BALANCE);
+            ? ROLLUP_PROCESSOR_WEI_BALANCE - rollupProcessor.balance
+            : rollupProcessor.balance - ROLLUP_PROCESSOR_WEI_BALANCE;
         assertLe(diffInETH, 1);
 
         hevm.stopPrank();
@@ -259,8 +260,8 @@ contract TroveBridgeTest is TestUtil {
         uint256 ownerTBBalance = bridge.balanceOf(OWNER);
         uint256 ownerLUSDBalance = tokens["LUSD"].erc.balanceOf(OWNER);
 
-        uint256 borrowerFee = ownerTBBalance.sub(ownerLUSDBalance).sub(200e18);
-        uint256 amountToRepay = ownerLUSDBalance.add(borrowerFee);
+        uint256 borrowerFee = ownerTBBalance - ownerLUSDBalance - 200e18;
+        uint256 amountToRepay = ownerLUSDBalance + borrowerFee;
 
         mint("LUSD", OWNER, borrowerFee);
         tokens["LUSD"].erc.approve(address(bridge), amountToRepay);
@@ -277,8 +278,8 @@ contract TroveBridgeTest is TestUtil {
         // I want to check whether withdrawn amount of ETH is the same as the ROLLUP_PROCESSOR_WEI_BALANCE.
         // There is some imprecision so the amount is allowed to be different by 1 wei.
         uint256 diffInETH = OWNER.balance < OWNER_WEI_BALANCE
-            ? OWNER_WEI_BALANCE.sub(OWNER.balance)
-            : OWNER.balance.sub(OWNER_WEI_BALANCE);
+            ? OWNER_WEI_BALANCE - OWNER.balance
+            : OWNER.balance - OWNER_WEI_BALANCE;
         assertLe(diffInETH, 1);
 
         // Check the TB total supply is 0

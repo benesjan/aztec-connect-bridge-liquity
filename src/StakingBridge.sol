@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-only
-pragma solidity 0.6.11;
-pragma experimental ABIEncoderV2;
+// Copyright 2020 Spilsbury Holdings Ltd
+pragma solidity >=0.8.0 <=0.8.10;
+pragma abicoder v2;
 
-import "../lib/openzeppelin-contracts/contracts/math/SafeMath.sol";
 import "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import "../lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 
@@ -31,8 +31,6 @@ import "./interfaces/ILQTYStaking.sol";
  * Note: StakingBridge.sol is very similar to StabilityPoolBridge.sol.
  */
 contract StakingBridge is IDefiBridge, ERC20("StakingBridge", "SB") {
-    using SafeMath for uint256;
-
     address public constant LUSD = 0x5f98805A4E8be255a32880FDeC7F6728C6568bA0;
     address public constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     address public constant LQTY = 0x6DEA81C8171D0bA574754EF6F8b412F2Ed88c54D;
@@ -47,7 +45,7 @@ contract StakingBridge is IDefiBridge, ERC20("StakingBridge", "SB") {
      * @notice Set the addresses of RollupProcessor.sol and token approvals.
      * @param _rollupProcessor Address of the RollupProcessor.sol
      */
-    constructor(address _rollupProcessor) public {
+    constructor(address _rollupProcessor) {
         rollupProcessor = _rollupProcessor;
 
         // Note: StakingBridge never holds LUSD, LQTY, USDC or WETH after or before an invocation of any of its
@@ -107,10 +105,10 @@ contract StakingBridge is IDefiBridge, ERC20("StakingBridge", "SB") {
                 // When the totalSupply is 0, I set the SB/LQTY ratio to be 1.
                 outputValueA = inputValue;
             } else {
-                uint256 totalLQTYOwnedBeforeDeposit = STAKING_CONTRACT.stakes(address(this)).sub(inputValue);
-                // this.totalSupply().div(totalLQTYOwnedBeforeDeposit) = how much SB one LQTY is worth
+                uint256 totalLQTYOwnedBeforeDeposit = STAKING_CONTRACT.stakes(address(this)) - inputValue;
+                // this.totalSupply() / totalLQTYOwnedBeforeDeposit = how much SB one LQTY is worth
                 // When I multiply this ^ with the amount of LQTY deposited I get the amount of SB to be minted.
-                outputValueA = this.totalSupply().mul(inputValue).div(totalLQTYOwnedBeforeDeposit);
+                outputValueA = (this.totalSupply() * inputValue) / totalLQTYOwnedBeforeDeposit;
             }
             _mint(rollupProcessor, outputValueA);
         } else {
@@ -123,9 +121,9 @@ contract StakingBridge is IDefiBridge, ERC20("StakingBridge", "SB") {
             STAKING_CONTRACT.unstake(0);
             _swapRewardsToLQTYAndStake();
 
-            // STAKING_CONTRACT.stakes(address(this)).div(this.totalSupply()) = how much LQTY is one SB
+            // STAKING_CONTRACT.stakes(address(this)) / this.totalSupply() = how much LQTY is one SB
             // outputValueA = amount of LQTY to be withdrawn and sent to rollupProcessor
-            outputValueA = STAKING_CONTRACT.stakes(address(this)).mul(inputValue).div(this.totalSupply());
+            outputValueA = (STAKING_CONTRACT.stakes(address(this)) * inputValue) / this.totalSupply();
             STAKING_CONTRACT.unstake(outputValueA);
             _burn(address(this), inputValue);
             require(IERC20(LQTY).transfer(rollupProcessor, outputValueA), "StakingBridge: WITHDRAWAL_TRANSFER_FAILED");

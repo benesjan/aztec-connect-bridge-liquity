@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-only
-pragma solidity 0.6.11;
+pragma solidity >=0.8.0 <=0.8.10;
 
 import "../../interfaces/IPriceFeed.sol";
 
 contract MockPriceFeed is IPriceFeed {
     uint256 public immutable lastGoodPrice;
 
-    constructor(uint256 _price) public {
+    constructor(uint256 _price) {
         lastGoodPrice = _price;
     }
 

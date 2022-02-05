@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
-pragma solidity 0.6.11;
-pragma experimental ABIEncoderV2;
+// Copyright 2020 Spilsbury Holdings Ltd
+pragma solidity >=0.8.0 <=0.8.10;
+pragma abicoder v2;
 
 import "../StabilityPoolBridge.sol";
 import "../Types.sol";

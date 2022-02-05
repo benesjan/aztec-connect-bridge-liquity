@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.6.11;
+pragma solidity >=0.8.0 <=0.8.10;
 
 interface ILQTYStaking {
     function stakes(address _user) external view returns (uint);

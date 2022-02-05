@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
-pragma solidity 0.6.11;
-pragma experimental ABIEncoderV2;
+// Copyright 2020 Spilsbury Holdings Ltd
+pragma solidity >=0.8.0 <=0.8.10;
+pragma abicoder v2;
 
 import "../StakingBridge.sol";
 import "../Types.sol";
@@ -16,7 +17,7 @@ contract StakingBridgeTestInternal is TestUtil, StakingBridge(address(0)) {
 
         // Note: to make the tests faster I will burn most of the ETH. This contract gets 79 million ETH by default.
         // This makes swapping through Uni v3 slow as it has the loop through the ticks for many seconds
-        address(0).transfer(address(this).balance - 1 ether);
+        payable(address(0)).transfer(address(this).balance - 1 ether);
 
         uint256 stakedLQTYBeforeSwap = STAKING_CONTRACT.stakes(address(this));
         _swapRewardsToLQTYAndStake();

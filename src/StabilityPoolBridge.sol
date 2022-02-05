@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-only
-pragma solidity 0.6.11;
-pragma experimental ABIEncoderV2;
+// Copyright 2020 Spilsbury Holdings Ltd
+pragma solidity >=0.8.0 <=0.8.10;
+pragma abicoder v2;
 
-import "../lib/openzeppelin-contracts/contracts/math/SafeMath.sol";
 import "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import "../lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 
@@ -33,8 +33,6 @@ import "./interfaces/IStabilityPool.sol";
  * Note: StabilityPoolBridge.sol is very similar to StakingBridge.sol.
  */
 contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB") {
-    using SafeMath for uint256;
-
     address public constant LUSD = 0x5f98805A4E8be255a32880FDeC7F6728C6568bA0;
     address public constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     address public constant LQTY = 0x6DEA81C8171D0bA574754EF6F8b412F2Ed88c54D;
@@ -53,7 +51,7 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
      * @dev Frontend tag is set here because there can be only 1 frontend tag per msg.sender in the StabilityPool.sol.
      * See https://docs.liquity.org/faq/frontend-operators#how-do-frontend-tags-work[Liquity docs] for more details.
      */
-    constructor(address _rollupProcessor, address _frontEndTag) public {
+    constructor(address _rollupProcessor, address _frontEndTag) {
         rollupProcessor = _rollupProcessor;
         frontEndTag = _frontEndTag;
 
@@ -122,17 +120,15 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
             // Deposit LUSD and claim rewards.
             STABILITY_POOL.provideToSP(inputValue, frontEndTag);
             _swapRewardsToLUSDAndDeposit();
-            uint256 totalLUSDOwnedBeforeDeposit = STABILITY_POOL.getCompoundedLUSDDeposit(address(this)).sub(
-                inputValue
-            );
+            uint256 totalLUSDOwnedBeforeDeposit = STABILITY_POOL.getCompoundedLUSDDeposit(address(this)) - inputValue;
             // outputValueA = how much SPB should be minted
             if (this.totalSupply() == 0) {
                 // When the totalSupply is 0, I set the SPB/LUSD ratio to be 1.
                 outputValueA = inputValue;
             } else {
-                // this.totalSupply().div(totalLUSDOwnedBeforeDeposit) = how much SPB one LUSD is worth
+                // this.totalSupply() / totalLUSDOwnedBeforeDeposit = how much SPB one LUSD is worth
                 // When I multiply this ^ with the amount of LUSD deposited I get the amount of SPB to be minted.
-                outputValueA = this.totalSupply().mul(inputValue).div(totalLUSDOwnedBeforeDeposit);
+                outputValueA = (this.totalSupply() * inputValue) / totalLUSDOwnedBeforeDeposit;
             }
             _mint(rollupProcessor, outputValueA);
         } else {
@@ -145,11 +141,9 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
             STABILITY_POOL.withdrawFromSP(0);
             _swapRewardsToLUSDAndDeposit();
 
-            // stabilityPool.getCompoundedLUSDDeposit(address(this)).div(this.totalSupply()) = how much LUSD is one SPB
+            // stabilityPool.getCompoundedLUSDDeposit(address(this)) / this.totalSupply() = how much LUSD is one SPB
             // outputValueA = amount of LUSD to be withdrawn and sent to RollupProcessor.sol
-            outputValueA = STABILITY_POOL.getCompoundedLUSDDeposit(address(this)).mul(inputValue).div(
-                this.totalSupply()
-            );
+            outputValueA = (STABILITY_POOL.getCompoundedLUSDDeposit(address(this)) * inputValue) / this.totalSupply();
             STABILITY_POOL.withdrawFromSP(outputValueA);
             _burn(address(this), inputValue);
             require(
