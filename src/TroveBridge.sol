@@ -15,6 +15,20 @@ import "../lib/openzeppelin-contracts/contracts/utils/Strings.sol";
 import "./interfaces/ISortedTroves.sol";
 import "./interfaces/IRollupProcessor.sol";
 
+/**
+ * @title Aztec Connect Bridge for opening and closing Liquity's troves
+ * @author Jan Benes (@benesjan on Github and Telegram)
+ * @notice You can use this contract to borrow and repay LUSD
+ * @dev The contract inherits from OpenZeppelin's implementation of ERC20 token because token balances are used to track
+ * the depositor's ownership of the assets controlled by the bridge contract. The token is called TroveBridge and
+ * the token symbol is TB-[initial ICR] (ICR is an acronym for individual collateral ratio). 1 TB token always
+ * represents 1 LUSD worth of debt. In case the trove is not closed by redemption or liquidation, users can withdraw
+ * their collateral by supplying TB and an equal amount of LUSD to the bridge. 1 deployment of the bridge contract
+ * controls 1 trove. The bridge keeps precise accounting of debt by making sure that no user can change the trove's ICR.
+ * This means that when a price goes down the only way how a user can avoid liquidation penalty is to repay their debt.
+ * In case the trove gets liquidated, the bridge no longer controls any ETH and all the TB balances get erased.
+ * If the trove is closed by redemption, users can withdraw their remaining collateral by supplying their TB.
+ */
 contract TroveBridge is IDefiBridge, ERC20, Ownable {
     using SafeMath for uint256;
     using Strings for uint256;
@@ -26,12 +40,13 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
     ISortedTroves public constant sortedTroves = ISortedTroves(0x8FdD3fbFEb32b28fb73555518f8b361bCeA741A6);
 
     address public immutable rollupProcessor;
-    uint256 public immutable initialICR; // ICR is an acronym for individual collateral ratio
+    uint256 public immutable initialICR;
     uint256 public immutable maxFee;
 
     // Used to check whether collateral has already been claimed during redemptions.
     bool private _collateralClaimed = false;
 
+    // Trove status taken from TroveManager.sol
     enum Status {
         nonExistent,
         active,
