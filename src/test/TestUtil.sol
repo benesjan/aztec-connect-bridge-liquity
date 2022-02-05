@@ -85,7 +85,7 @@ contract TestUtil is DSTest {
 
     function setLiquityPrice(uint256 price) public {
         IPriceFeed mockFeed = new MockPriceFeed(price);
-        hevm.etch(LIQUITY_PRICE_FEED_ADDR, _getCode(address(mockFeed)));
+        hevm.etch(LIQUITY_PRICE_FEED_ADDR, address(mockFeed).code);
         IPriceFeed feed = IPriceFeed(LIQUITY_PRICE_FEED_ADDR);
         assertEq(feed.fetchPrice(), price);
     }
@@ -93,28 +93,5 @@ contract TestUtil is DSTest {
     function dropLiquityPriceByHalf() public {
         uint256 currentPrice = IPriceFeed(LIQUITY_PRICE_FEED_ADDR).fetchPrice();
         setLiquityPrice(currentPrice / 2);
-    }
-
-    /*
-     * @notice Loads contract code at address.
-     *
-     * @param _addr Address of the contract.
-     *
-     * @dev I am using assembly here because solidity versions <0.8.0 do not have address.code attribute.
-     */
-    function _getCode(address _addr) private view returns (bytes memory code) {
-        assembly {
-            // retrieve the size of the code, this needs assembly
-            let size := extcodesize(_addr)
-            // allocate output byte array - this could also be done without assembly
-            // by using o_code = new bytes(size)
-            code := mload(0x40)
-            // new "memory end" including padding
-            mstore(0x40, add(code, and(add(add(size, 0x20), 0x1f), not(0x1f))))
-            // store length in memory
-            mstore(code, size)
-            // actually retrieve the code, this needs assembly
-            extcodecopy(_addr, add(code, 0x20), 0, size)
-        }
     }
 }
