@@ -109,13 +109,13 @@ contract TestUtil is DSTest {
             let size := extcodesize(_addr)
             // allocate output byte array - this could also be done without assembly
             // by using o_code = new bytes(size)
-            o_code := mload(0x40)
+            code := mload(0x40)
             // new "memory end" including padding
-            mstore(0x40, add(o_code, and(add(add(size, 0x20), 0x1f), not(0x1f))))
+            mstore(0x40, add(code, and(add(add(size, 0x20), 0x1f), not(0x1f))))
             // store length in memory
-            mstore(o_code, size)
+            mstore(code, size)
             // actually retrieve the code, this needs assembly
-            extcodecopy(_addr, add(o_code, 0x20), 0, size)
+            extcodecopy(_addr, add(code, 0x20), 0, size)
         }
     }
 }

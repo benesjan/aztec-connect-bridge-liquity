@@ -6,12 +6,12 @@ import "../lib/openzeppelin-contracts/contracts/math/SafeMath.sol";
 import "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import "../lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import "../lib/openzeppelin-contracts/contracts/access/Ownable.sol";
+import "../lib/openzeppelin-contracts/contracts/utils/Strings.sol";
 
 import "./Types.sol";
 import "./interfaces/IDefiBridge.sol";
 import "./interfaces/IBorrowerOperations.sol";
 import "./interfaces/ITroveManager.sol";
-import "../lib/openzeppelin-contracts/contracts/utils/Strings.sol";
 import "./interfaces/ISortedTroves.sol";
 import "./interfaces/IRollupProcessor.sol";
 
