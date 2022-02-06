@@ -149,7 +149,7 @@ contract TroveBridgeTest is TestUtil {
             address(bridge)
         );
         // Check the TB total supply equals totalDebt
-        assertEq(IERC20(address(bridge)).totalSupply(), debtAfterBorrowing);
+        assertEq(bridge.totalSupply(), debtAfterBorrowing);
         // Check the trove's collateral equals deposit amount
         assertEq(collAfterBorrowing, OWNER_WEI_BALANCE);
 
@@ -164,9 +164,6 @@ contract TroveBridgeTest is TestUtil {
     }
 
     function _borrow() private {
-        // Send ROLLUP_PROCESSOR_WEI_BALANCE to the bridge contract
-        require(payable(address(bridge)).send(ROLLUP_PROCESSOR_WEI_BALANCE), "TroveBridgeTest: ETH_TRANSFER_FAILED");
-
         uint256 price = bridge.troveManager().priceFeed().fetchPrice();
         uint256 icrBeforeBorrowing = bridge.troveManager().getCurrentICR(address(bridge), price);
 
@@ -195,7 +192,7 @@ contract TroveBridgeTest is TestUtil {
         assertEq(icrBeforeBorrowing, icrAfterBorrowing);
 
         // Check the TB total supply equals totalDebt
-        assertEq(IERC20(address(bridge)).totalSupply(), debtAfterBorrowing);
+        assertEq(bridge.totalSupply(), debtAfterBorrowing);
 
         // Check the bridge doesn't hold any ETH or LUSD
         assertEq(address(bridge).balance, 0);
