@@ -67,9 +67,6 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
         processor = _processor;
         initialICR = _initialICRPerc * 1e16;
         maxFee = _maxFee;
-
-        require(IERC20(LUSD).approve(address(_rollupProcessor), type(uint256).max), "TroveBridge: LUSD_APPROVE_FAILED");
-        require(this.approve(address(_rollupProcessor), type(uint256).max), "TroveBridge: TB_APPROVE_FAILED");
     }
 
     /**
@@ -83,6 +80,9 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
     function openTrove(address _upperHint, address _lowerHint) external payable onlyOwner {
         // Check whether trove is inactive/closed and whether TB balances were reset after liquidation/redemption
         require(this.totalSupply() == 0, "TroveBridge: INCORRECT_TOTAL_SUPPLY");
+
+        require(IERC20(LUSD).approve(processor, type(uint256).max), "TroveBridge: LUSD_APPROVE_FAILED");
+        require(this.approve(processor, type(uint256).max), "TroveBridge: TB_APPROVE_FAILED");
 
         uint256 amtToBorrow = computeAmtToBorrow(msg.value);
 
