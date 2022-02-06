@@ -38,7 +38,7 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
     ITroveManager public constant troveManager = ITroveManager(0xA39739EF8b0231DbFA0DcdA07d7e29faAbCf4bb2);
     ISortedTroves public constant sortedTroves = ISortedTroves(0x8FdD3fbFEb32b28fb73555518f8b361bCeA741A6);
 
-    address public immutable rollupProcessor;
+    address public immutable processor;
     uint256 public immutable initialICR;
     uint256 public immutable maxFee;
 
@@ -56,15 +56,15 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
 
     /**
      * @notice Set the address of RollupProcessor.sol and initial ICR
-     * @param _rollupProcessor Address of the RollupProcessor.sol
+     * @param _processor Address of the RollupProcessor.sol
      * @param _initialICRPerc Collateral ratio denominated in percents to be used when opening the Trove
      */
     constructor(
-        address _rollupProcessor,
+        address _processor,
         uint256 _initialICRPerc,
         uint256 _maxFee
     ) ERC20("TroveBridge", string(abi.encodePacked("TB-", _initialICRPerc.toString()))) {
-        rollupProcessor = _rollupProcessor;
+        processor = _processor;
         initialICR = _initialICRPerc * 1e16;
         maxFee = _maxFee;
 
@@ -128,7 +128,7 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
             bool isAsync
         )
     {
-        require(msg.sender == rollupProcessor, "TroveBridge: INVALID_CALLER");
+        require(msg.sender == processor, "TroveBridge: INVALID_CALLER");
         isAsync = false;
         Status troveStatus = Status(troveManager.getTroveStatus(address(this)));
 
@@ -163,7 +163,7 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
             outputValueA = (coll * inputValue) / this.totalSupply(); // Amount of collateral to withdraw
             operations.adjustTrove(maxFee, outputValueA, inputValue, false, upperHint, lowerHint);
             _burn(address(this), inputValue);
-            IRollupProcessor(rollupProcessor).receiveEthFromBridge{value: outputValueA}(interactionNonce);
+            IRollupProcessor(processor).receiveEthFromBridge{value: outputValueA}(interactionNonce);
         } else if (
             inputAssetA.erc20Address == address(this) && outputAssetA.assetType == AztecTypes.AztecAssetType.ETH
         ) {
@@ -175,7 +175,7 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
             }
             outputValueA = (address(this).balance * inputValue) / this.totalSupply();
             _burn(address(this), inputValue);
-            IRollupProcessor(rollupProcessor).receiveEthFromBridge{value: outputValueA}(interactionNonce);
+            IRollupProcessor(processor).receiveEthFromBridge{value: outputValueA}(interactionNonce);
         } else {
             require(false, "TroveBridge: INCORRECT_INPUT");
         }
@@ -199,7 +199,7 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
             // TODO: is this ok or are ERC20 balances withdrawable from RollupProcessor.sol to non-bridge L1 address?
             // If they are withdrawable this is a potential vulnerability!!!
             _burn(owner, ownerTBBalance);
-            _burn(rollupProcessor, this.balanceOf(rollupProcessor));
+            _burn(processor, this.balanceOf(processor));
         } else {
             require(ownerTBBalance == _totalSupply, "TroveBridge: OWNER_MUST_BE_LAST");
 
