@@ -13,8 +13,8 @@ contract StakingBridgeTest is TestUtil {
     function setUp() public {
         _aztecPreSetup();
         setUpTokens();
-        address rollupProcessor = address(this);
-        bridge = new StakingBridge(rollupProcessor);
+        bridge = new StakingBridge(address(rollupProcessor));
+        bridge.setApprovals();
     }
 
     function testInitialERC20Params() public {
@@ -28,10 +28,11 @@ contract StakingBridgeTest is TestUtil {
         uint256 depositAmount = 1e24;
 
         // 1. Mint the deposit amount of LQTY to the bridge
-        mint("LQTY", address(bridge), depositAmount);
+        mint("LQTY", address(rollupProcessor), depositAmount);
 
         // 2. Deposit LQTY to the staking contract through the bridge
-        bridge.convert(
+        rollupProcessor.convert(
+            address(bridge),
             AztecTypes.AztecAsset(1, tokens["LQTY"].addr, AztecTypes.AztecAssetType.ERC20),
             AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
             AztecTypes.AztecAsset(2, address(bridge), AztecTypes.AztecAssetType.ERC20),
@@ -44,8 +45,8 @@ contract StakingBridgeTest is TestUtil {
         // 3. Check the total supply of SB token is equal to the amount of LQTY deposited
         assertEq(bridge.totalSupply(), depositAmount);
 
-        // 4. Check the SB balance of this is equal to the amount of LQTY deposited
-        assertEq(bridge.balanceOf(address(this)), depositAmount);
+        // 4. Check the SB balance of rollupProcessor is equal to the amount of LQTY deposited
+        assertEq(bridge.balanceOf(address(rollupProcessor)), depositAmount);
 
         // 5. Check the LQTY balance of StakingBridge in the staking contract is equal to the amount of LQTY deposited
         assertEq(bridge.STAKING_CONTRACT().stakes(address(bridge)), depositAmount);
@@ -53,25 +54,23 @@ contract StakingBridgeTest is TestUtil {
         // 6. withdrawAmount is equal to depositAmount because there were no rewards claimed -> LQTY/SB ratio stayed 1
         uint256 withdrawAmount = depositAmount;
 
-        // 7. Transfer the withdraw amount of SB to the bridge
-        require(bridge.transfer(address(bridge), withdrawAmount), "StakingBridgeTest: WITHDRAW_TRANSFER_FAILED");
-
-        // 8. Withdraw LQTY from the staking contract through the bridge
-        bridge.convert(
+        // 7. Withdraw LQTY from the staking contract through the bridge
+        rollupProcessor.convert(
+            address(bridge),
             AztecTypes.AztecAsset(2, address(bridge), AztecTypes.AztecAssetType.ERC20),
             AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
             AztecTypes.AztecAsset(1, tokens["LQTY"].addr, AztecTypes.AztecAssetType.ERC20),
             AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
             depositAmount,
-            0,
+            1,
             0
         );
 
-        // 9. Check the total supply of SPB token is 0
+        // 8. Check the total supply of SPB token is 0
         assertEq(bridge.totalSupply(), 0);
 
-        // 10. Check the LQTY balance of this contract is equal to the initial LQTY deposit
-        assertEq(tokens["LQTY"].erc.balanceOf(address(this)), depositAmount);
+        // 9. Check the LQTY balance of rollupProcessor is equal to the initial LQTY deposit
+        assertEq(tokens["LQTY"].erc.balanceOf(address(rollupProcessor)), depositAmount);
     }
 
     function test10DepositsWithdrawals() public {
@@ -82,20 +81,21 @@ contract StakingBridgeTest is TestUtil {
 
         while (i < numIters) {
             depositAmount = rand(depositAmount);
-            // 1. Mint deposit amount of LQTY to the bridge
-            mint("LQTY", address(bridge), depositAmount);
+            // 1. Mint deposit amount of LQTY to the rollupProcessor
+            mint("LQTY", address(rollupProcessor), depositAmount);
             // 2. Mint rewards to the bridge
             mint("LUSD", address(bridge), 1e20);
             mint("WETH", address(bridge), 1e18);
 
             // 3. Deposit LQTY to the staking contract through the bridge
-            (uint256 outputValueA, , ) = bridge.convert(
+            (uint256 outputValueA, , ) = rollupProcessor.convert(
+                address(bridge),
                 AztecTypes.AztecAsset(1, tokens["LQTY"].addr, AztecTypes.AztecAssetType.ERC20),
                 AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
                 AztecTypes.AztecAsset(2, address(bridge), AztecTypes.AztecAssetType.ERC20),
                 AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
                 depositAmount,
-                0,
+                i,
                 0
             );
 
@@ -105,18 +105,15 @@ contract StakingBridgeTest is TestUtil {
 
         i = 0;
         while (i < numIters) {
-            uint256 withdrawAmount = sbBalances[i];
-            // 4. Transfer the withdraw amount of SB to the bridge
-            require(bridge.transfer(address(bridge), withdrawAmount), "StakingBridgeTest: WITHDRAW_TRANSFER_FAILED");
-
-            // 5. Withdraw LQTY from Staking through the bridge
-            bridge.convert(
+            // 4. Withdraw LQTY from Staking through the bridge
+            rollupProcessor.convert(
+                address(bridge),
                 AztecTypes.AztecAsset(2, address(bridge), AztecTypes.AztecAssetType.ERC20),
                 AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
                 AztecTypes.AztecAsset(1, tokens["LQTY"].addr, AztecTypes.AztecAssetType.ERC20),
                 AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
-                withdrawAmount,
-                0,
+                    sbBalances[i],
+                numIters + i,
                 0
             );
             i++;

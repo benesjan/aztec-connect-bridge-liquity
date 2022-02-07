@@ -54,10 +54,17 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
     constructor(address _processor, address _frontEndTag) {
         processor = _processor;
         frontEndTag = _frontEndTag;
+    }
 
-        // Note: StabilityPoolBridge never holds LUSD, LQTY, USDC or WETH after or before an invocation of any of its
-        // functions. For this reason the following is not a security risk and makes the convert() function more gas
-        // efficient.
+    /**
+     * @notice Sets all the important approvals.
+     * @dev StabilityPoolBridge never holds LUSD, LQTY, USDC or WETH after or before an invocation of any of its
+     * functions. For this reason the following is not a security risk and makes the convert() function more gas
+     * efficient.
+     */
+    function setApprovals() public {
+        require(this.approve(processor, type(uint256).max), "StabilityPoolBridge: SPB_APPROVE_FAILED");
+        require(IERC20(LUSD).approve(processor, type(uint256).max), "StabilityPoolBridge: LUSD_APPROVE_FAILED");
         require(
             IERC20(LUSD).approve(address(STABILITY_POOL), type(uint256).max),
             "StabilityPoolBridge: LUSD_APPROVE_FAILED"
@@ -130,7 +137,7 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
                 // When I multiply this ^ with the amount of LUSD deposited I get the amount of SPB to be minted.
                 outputValueA = (this.totalSupply() * inputValue) / totalLUSDOwnedBeforeDeposit;
             }
-            _mint(processor, outputValueA);
+            _mint(address(this), outputValueA);
         } else {
             // Withdrawal
             require(
@@ -146,7 +153,6 @@ contract StabilityPoolBridge is IDefiBridge, ERC20("StabilityPoolBridge", "SPB")
             outputValueA = (STABILITY_POOL.getCompoundedLUSDDeposit(address(this)) * inputValue) / this.totalSupply();
             STABILITY_POOL.withdrawFromSP(outputValueA);
             _burn(address(this), inputValue);
-            require(IERC20(LUSD).transfer(processor, outputValueA), "StabilityPoolBridge: WITHDRAWAL_TRANSFER_FAILED");
         }
     }
 
