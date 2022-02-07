@@ -53,32 +53,44 @@ contract TroveBridgeTest is TestUtil {
         assertEq(uint256(bridge.decimals()), 18);
     }
 
-    function testFailIncorrectTroveState() public {
+    function testIncorrectTroveState() public {
         // Attempt borrowing when trove was not opened - state 0
         hevm.prank(address(rollupProcessor));
-        bridge.convert(
-            AztecTypes.AztecAsset(3, address(0), AztecTypes.AztecAssetType.ETH),
-            AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
-            AztecTypes.AztecAsset(2, address(bridge), AztecTypes.AztecAssetType.ERC20),
-            AztecTypes.AztecAsset(1, tokens["LUSD"].addr, AztecTypes.AztecAssetType.ERC20),
-            ROLLUP_PROCESSOR_WEI_BALANCE,
-            0,
-            0
-        );
+        try
+            bridge.convert(
+                AztecTypes.AztecAsset(3, address(0), AztecTypes.AztecAssetType.ETH),
+                AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
+                AztecTypes.AztecAsset(2, address(bridge), AztecTypes.AztecAssetType.ERC20),
+                AztecTypes.AztecAsset(1, tokens["LUSD"].addr, AztecTypes.AztecAssetType.ERC20),
+                ROLLUP_PROCESSOR_WEI_BALANCE,
+                0,
+                0
+            )
+        {
+            assertTrue(false, "convert(...) has to revert when trove is in an incorrect state.");
+        } catch Error(string memory reason) {
+            assertEq(reason, "TroveBridge: INACTIVE_TROVE");
+        }
     }
 
-    function testFailIncorrectInput() public {
+    function testIncorrectInput() public {
         // Call convert with incorrect input
         hevm.prank(address(rollupProcessor));
-        bridge.convert(
-            AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
-            AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
-            AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
-            AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
-            0,
-            0,
-            0
-        );
+        try
+            bridge.convert(
+                AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
+                AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
+                AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
+                AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
+                0,
+                0,
+                0
+            )
+        {
+            assertTrue(false, "convert(...) has to revert on incorrect input.");
+        } catch Error(string memory reason) {
+            assertEq(reason, "TroveBridge: INCORRECT_INPUT");
+        }
     }
 
     function testFullFlow() public {
