@@ -220,6 +220,10 @@ contract TroveBridgeTest is TestUtil {
         // Check the bridge doesn't hold any ETH or LUSD
         assertEq(address(bridge).balance, 0);
         assertEq(tokens["LUSD"].erc.balanceOf(address(bridge)), 0);
+
+        // Check the tokens were successfully sent to the rollupProcessor
+        assertGt(bridge.balanceOf(address(rollupProcessor)), 0);
+        assertGt(tokens["LUSD"].erc.balanceOf(address(rollupProcessor)), 0);
     }
 
     function _repay() private {
