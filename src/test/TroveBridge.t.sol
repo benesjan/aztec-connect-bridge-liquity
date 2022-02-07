@@ -54,9 +54,9 @@ contract TroveBridgeTest is TestUtil {
     }
 
     function testFailIncorrectTroveState() public {
-        // Borrow when trove was not opened - state 0
-        rollupProcessor.convert(
-            address(bridge),
+        // Attempt borrowing when trove was not opened - state 0
+        hevm.prank(address(rollupProcessor));
+        bridge.convert(
             AztecTypes.AztecAsset(3, address(0), AztecTypes.AztecAssetType.ETH),
             AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
             AztecTypes.AztecAsset(2, address(bridge), AztecTypes.AztecAssetType.ERC20),
@@ -68,9 +68,9 @@ contract TroveBridgeTest is TestUtil {
     }
 
     function testFailIncorrectInput() public {
-        // Borrow when trove was not opened - state 0
-        rollupProcessor.convert(
-            address(bridge),
+        // Call convert with incorrect input
+        hevm.prank(address(rollupProcessor));
+        bridge.convert(
             AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
             AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
             AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
@@ -200,9 +200,6 @@ contract TroveBridgeTest is TestUtil {
     }
 
     function _repay() private {
-        // Set msg.sender to ROLLUP_PROCESSOR
-        hevm.startPrank(address(rollupProcessor));
-
         uint256 processorTBBalance = bridge.balanceOf(address(rollupProcessor));
         uint256 processorLUSDBalance = tokens["LUSD"].erc.balanceOf(address(rollupProcessor));
 
@@ -210,20 +207,14 @@ contract TroveBridgeTest is TestUtil {
         // Mint the borrower fee to ROLLUP_PROCESSOR in order to have a big enough balance for repaying
         mint("LUSD", address(rollupProcessor), borrowerFee);
 
-        // Transfer TB and LUSD to the bridge before repaying
-        require(bridge.transfer(address(bridge), processorTBBalance), "TroveBridgeTest: TB_TRANSFER_FAILED");
-        require(
-            tokens["LUSD"].erc.transfer(address(bridge), processorTBBalance),
-            "TroveBridgeTest: LUSD_TRANSFER_FAILED"
-        );
-
-        bridge.convert(
+        rollupProcessor.convert(
+            address(bridge),
             AztecTypes.AztecAsset(2, address(bridge), AztecTypes.AztecAssetType.ERC20),
             AztecTypes.AztecAsset(1, tokens["LUSD"].addr, AztecTypes.AztecAssetType.ERC20),
             AztecTypes.AztecAsset(3, address(0), AztecTypes.AztecAssetType.ETH),
             AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
             processorTBBalance,
-            0,
+            1,
             0
         );
 
@@ -237,8 +228,6 @@ contract TroveBridgeTest is TestUtil {
             ? ROLLUP_PROCESSOR_WEI_BALANCE - address(rollupProcessor).balance
             : address(rollupProcessor).balance - ROLLUP_PROCESSOR_WEI_BALANCE;
         assertLe(diffInETH, 1);
-
-        hevm.stopPrank();
     }
 
     function _closeTrove() private {
@@ -277,15 +266,10 @@ contract TroveBridgeTest is TestUtil {
     }
 
     function _redeem() private {
-        // Set msg.sender to ROLLUP_PROCESSOR
-        hevm.startPrank(address(rollupProcessor));
-
         uint256 processorTBBalance = bridge.balanceOf(address(rollupProcessor));
 
-        // Transfer TB to the bridge before redeeming
-        require(bridge.transfer(address(bridge), processorTBBalance), "TroveBridgeTest: TB_TRANSFER_FAILED");
-
-        bridge.convert(
+        rollupProcessor.convert(
+            address(bridge),
             AztecTypes.AztecAsset(2, address(bridge), AztecTypes.AztecAssetType.ERC20),
             AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
             AztecTypes.AztecAsset(3, address(0), AztecTypes.AztecAssetType.ETH),
@@ -297,8 +281,6 @@ contract TroveBridgeTest is TestUtil {
 
         // Check that non-zero amount of ETH has been redeemed
         assertGt(address(rollupProcessor).balance, 0);
-
-        hevm.stopPrank();
     }
 
     function _closeRedeem() private {
