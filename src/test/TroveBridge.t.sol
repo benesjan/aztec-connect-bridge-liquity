@@ -114,11 +114,22 @@ contract TroveBridgeTest is TestUtil {
         assertTrue(troveStatus == Status.closedByLiquidation);
 
         // Set msg.sender to OWNER
-        hevm.prank(OWNER);
-        bridge.closeTrove();
+        hevm.startPrank(OWNER);
 
-        // Check that all balances have been wiped
-        assertEq(bridge.totalSupply(), 0);
+        // Bridge is now defunct so check that closing and reopening fails with appropriate errors
+        try bridge.closeTrove() {
+            assertTrue(false, "closeTrove() has to revert in case owner's balance != TB total supply.");
+        } catch Error(string memory reason) {
+            assertEq(reason, "TroveBridge: OWNER_MUST_BE_LAST");
+        }
+
+        try bridge.openTrove(address(0), address(0)) {
+            assertTrue(false, "openTrove() has to revert in case TB total supply != 0.");
+        } catch Error(string memory reason) {
+            assertEq(reason, "TroveBridge: INCORRECT_TOTAL_SUPPLY");
+        }
+
+        hevm.stopPrank();
     }
 
     function testRedeemFlow() public {

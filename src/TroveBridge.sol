@@ -26,7 +26,11 @@ import "./interfaces/IRollupProcessor.sol";
  * their collateral by supplying TB and an equal amount of LUSD to the bridge. 1 deployment of the bridge contract
  * controls 1 trove. The bridge keeps precise accounting of debt by making sure that no user can change the trove's ICR.
  * This means that when a price goes down the only way how a user can avoid liquidation penalty is to repay their debt.
- * In case the trove gets liquidated, the bridge no longer controls any ETH and all the TB balances get erased.
+ *
+ * In case the trove gets liquidated, the bridge no longer controls any ETH and all the TB balances are irrelevant.
+ * At this point the bridge is defunct unless owner is the only one who borrowed. If owner is the only who borrowed
+ * calling closeTrove() will succeed and owner's balance will get burned making TB total supply 0.
+ *
  * If the trove is closed by redemption, users can withdraw their remaining collateral by supplying their TB.
  */
 contract TroveBridge is IDefiBridge, ERC20, Ownable {
@@ -78,7 +82,7 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
      * amount allowed by Liquity.
      */
     function openTrove(address _upperHint, address _lowerHint) external payable onlyOwner {
-        // Check whether trove is inactive/closed and whether TB balances were reset after liquidation/redemption
+        // Checks whether the trove can be safely opened/reopened
         require(this.totalSupply() == 0, "TroveBridge: INCORRECT_TOTAL_SUPPLY");
 
         require(IERC20(LUSD).approve(processor, type(uint256).max), "TroveBridge: LUSD_APPROVE_FAILED");
@@ -186,42 +190,29 @@ contract TroveBridge is IDefiBridge, ERC20, Ownable {
      * @dev LUSD allowance has to be at least (remaining debt - 200).
      */
     function closeTrove() public onlyOwner {
-        uint256 _totalSupply = totalSupply();
-        require(_totalSupply != 0, "TroveBridge: ZERO_TOTAL_SUPPLY");
-
         address payable owner = payable(owner());
         uint256 ownerTBBalance = balanceOf(owner);
+        require(ownerTBBalance == totalSupply(), "TroveBridge: OWNER_MUST_BE_LAST");
+
+        _burn(owner, ownerTBBalance);
 
         Status troveStatus = Status(troveManager.getTroveStatus(address(this)));
-
-        if (troveStatus == Status.closedByLiquidation) {
-            // Trove was liquidated. Wipe all the balances.
-            // TODO: is this ok or are ERC20 balances withdrawable from RollupProcessor.sol to non-bridge L1 address?
-            // If they are withdrawable this is a potential vulnerability!!!
-            _burn(owner, ownerTBBalance);
-            _burn(processor, this.balanceOf(processor));
-        } else {
-            require(ownerTBBalance == _totalSupply, "TroveBridge: OWNER_MUST_BE_LAST");
-
-            _burn(owner, ownerTBBalance);
-
-            if (troveStatus == Status.active) {
-                (uint256 remainingDebt, , , ) = troveManager.getEntireDebtAndColl(address(this));
-                // 200e18 is a part of debt which gets repaid from LUSD_GAS_COMPENSATION.
-                require(
-                    IERC20(LUSD).transferFrom(owner, address(this), remainingDebt - 200e18),
-                    "TroveBridge: LUSD_TRANSFER_FAILED"
-                );
-                operations.closeTrove();
-            } else if (troveStatus == Status.closedByRedemption) {
-                if (!_collateralClaimed) {
-                    operations.claimCollateral();
-                }
-                _collateralClaimed = true;
+        if (troveStatus == Status.active) {
+            (uint256 remainingDebt, , , ) = troveManager.getEntireDebtAndColl(address(this));
+            // 200e18 is a part of debt which gets repaid from LUSD_GAS_COMPENSATION.
+            require(
+                IERC20(LUSD).transferFrom(owner, address(this), remainingDebt - 200e18),
+                "TroveBridge: LUSD_TRANSFER_FAILED"
+            );
+            operations.closeTrove();
+        } else if (troveStatus == Status.closedByRedemption) {
+            if (!_collateralClaimed) {
+                operations.claimCollateral();
             }
-
-            owner.transfer(address(this).balance);
+            _collateralClaimed = true;
         }
+
+        owner.transfer(address(this).balance);
     }
 
     /**
