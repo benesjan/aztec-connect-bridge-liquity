@@ -112,7 +112,7 @@ contract StakingBridgeTest is TestUtil {
                 AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
                 AztecTypes.AztecAsset(1, tokens["LQTY"].addr, AztecTypes.AztecAssetType.ERC20),
                 AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
-                    sbBalances[i],
+                sbBalances[i],
                 numIters + i,
                 0
             );

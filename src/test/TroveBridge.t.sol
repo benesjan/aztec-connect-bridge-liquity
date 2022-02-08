@@ -39,12 +39,12 @@ contract TroveBridgeTest is TestUtil {
         uint256 initialCollateralRatio = 160;
         uint256 maxFee = 5e16; // Slippage protection: 5%
 
-        hevm.prank(OWNER);
+        vm.prank(OWNER);
         bridge = new TroveBridge(address(rollupProcessor), initialCollateralRatio, maxFee);
 
         // Set OWNER's and ROLLUP_PROCESSOR's balances
-        hevm.deal(OWNER, OWNER_WEI_BALANCE);
-        hevm.deal(address(rollupProcessor), ROLLUP_PROCESSOR_WEI_BALANCE);
+        vm.deal(OWNER, OWNER_WEI_BALANCE);
+        vm.deal(address(rollupProcessor), ROLLUP_PROCESSOR_WEI_BALANCE);
     }
 
     function testInitialERC20Params() public {
@@ -55,7 +55,7 @@ contract TroveBridgeTest is TestUtil {
 
     function testIncorrectTroveState() public {
         // Attempt borrowing when trove was not opened - state 0
-        hevm.prank(address(rollupProcessor));
+        vm.prank(address(rollupProcessor));
         try
             bridge.convert(
                 AztecTypes.AztecAsset(3, address(0), AztecTypes.AztecAssetType.ETH),
@@ -75,7 +75,7 @@ contract TroveBridgeTest is TestUtil {
 
     function testIncorrectInput() public {
         // Call convert with incorrect input
-        hevm.prank(address(rollupProcessor));
+        vm.prank(address(rollupProcessor));
         try
             bridge.convert(
                 AztecTypes.AztecAsset(0, address(0), AztecTypes.AztecAssetType.NOT_USED),
@@ -114,7 +114,7 @@ contract TroveBridgeTest is TestUtil {
         assertTrue(troveStatus == Status.closedByLiquidation);
 
         // Set msg.sender to OWNER
-        hevm.startPrank(OWNER);
+        vm.startPrank(OWNER);
 
         // Bridge is now defunct so check that closing and reopening fails with appropriate errors
         try bridge.closeTrove() {
@@ -129,7 +129,7 @@ contract TroveBridgeTest is TestUtil {
             assertEq(reason, "TroveBridge: INCORRECT_TOTAL_SUPPLY");
         }
 
-        hevm.stopPrank();
+        vm.stopPrank();
     }
 
     function testRedeemFlow() public {
@@ -149,7 +149,7 @@ contract TroveBridgeTest is TestUtil {
 
     function _openTrove() private {
         // Set msg.sender to OWNER
-        hevm.startPrank(OWNER);
+        vm.startPrank(OWNER);
 
         uint256 amtToBorrow = bridge.computeAmtToBorrow(OWNER_WEI_BALANCE);
         uint256 nicr = (OWNER_WEI_BALANCE * NICR_PRECISION) / amtToBorrow;
@@ -183,7 +183,7 @@ contract TroveBridgeTest is TestUtil {
         assertEq(address(bridge).balance, 0);
         assertEq(tokens["LUSD"].erc.balanceOf(address(bridge)), 0);
 
-        hevm.stopPrank();
+        vm.stopPrank();
     }
 
     function _borrow() private {
@@ -259,7 +259,7 @@ contract TroveBridgeTest is TestUtil {
 
     function _closeTrove() private {
         // Set msg.sender to OWNER
-        hevm.startPrank(OWNER);
+        vm.startPrank(OWNER);
 
         uint256 ownerTBBalance = bridge.balanceOf(OWNER);
         uint256 ownerLUSDBalance = tokens["LUSD"].erc.balanceOf(OWNER);
@@ -289,7 +289,7 @@ contract TroveBridgeTest is TestUtil {
         // Check the TB total supply is 0
         assertEq(bridge.totalSupply(), 0);
 
-        hevm.stopPrank();
+        vm.stopPrank();
     }
 
     function _redeem() private {
@@ -312,7 +312,7 @@ contract TroveBridgeTest is TestUtil {
 
     function _closeRedeem() private {
         // Set msg.sender to OWNER
-        hevm.startPrank(OWNER);
+        vm.startPrank(OWNER);
 
         bridge.closeTrove();
 
@@ -325,7 +325,7 @@ contract TroveBridgeTest is TestUtil {
         // Check the TB total supply is 0
         assertEq(bridge.totalSupply(), 0);
 
-        hevm.stopPrank();
+        vm.stopPrank();
     }
 
     receive() external payable {}

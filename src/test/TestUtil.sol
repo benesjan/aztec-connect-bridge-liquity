@@ -9,30 +9,13 @@ import "../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import "../../lib/ds-test/src/test.sol";
 import "./mocks/MockPriceFeed.sol";
 import "./mocks/MockRollupProcessor.sol";
-
-interface Hevm {
-    function store(
-        address,
-        bytes32,
-        bytes32
-    ) external;
-
-    function prank(address) external;
-
-    function startPrank(address) external;
-
-    function stopPrank() external;
-
-    function deal(address, uint256) external;
-
-    function etch(address, bytes calldata) external;
-}
+import "./Vm.sol";
 
 contract TestUtil is DSTest {
-    Hevm internal hevm;
+    Vm internal vm = Vm(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D);
 
-    DefiBridgeProxy defiBridgeProxy;
-    MockRollupProcessor rollupProcessor;
+    DefiBridgeProxy internal defiBridgeProxy;
+    MockRollupProcessor internal rollupProcessor;
 
     struct Token {
         address addr; // ERC20 Mainnet address
@@ -43,10 +26,6 @@ contract TestUtil is DSTest {
     address internal constant LIQUITY_PRICE_FEED_ADDR = 0x4c517D4e2C851CA76d7eC94B805269Df0f2201De;
 
     mapping(bytes32 => Token) internal tokens;
-
-    constructor() {
-        hevm = Hevm(address(bytes20(uint160(uint256(keccak256("hevm cheat code"))))));
-    }
 
     function setUpTokens() public {
         tokens["LUSD"].addr = 0x5f98805A4E8be255a32880FDeC7F6728C6568bA0;
@@ -72,7 +51,7 @@ contract TestUtil is DSTest {
         uint256 slot = tokens[symbol].slot;
         uint256 bal = IERC20(addr).balanceOf(account);
 
-        hevm.store(
+        vm.store(
             addr,
             keccak256(abi.encode(account, slot)), // Mint tokens
             bytes32(bal + amt)
@@ -89,7 +68,7 @@ contract TestUtil is DSTest {
 
     function setLiquityPrice(uint256 price) public {
         IPriceFeed mockFeed = new MockPriceFeed(price);
-        hevm.etch(LIQUITY_PRICE_FEED_ADDR, address(mockFeed).code);
+        vm.etch(LIQUITY_PRICE_FEED_ADDR, address(mockFeed).code);
         IPriceFeed feed = IPriceFeed(LIQUITY_PRICE_FEED_ADDR);
         assertEq(feed.fetchPrice(), price);
     }
